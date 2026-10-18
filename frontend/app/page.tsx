@@ -1,2 +1,5 @@
-import SignIn from "@/components/sign-in";
-export default function Home() { return <SignIn />; }
+import Workspace from "./workspace/page";
+
+export default function Home() {
+  return <Workspace />;
+}
