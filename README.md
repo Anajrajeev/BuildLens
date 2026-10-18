@@ -8,13 +8,13 @@ Secure, multi-tenant construction operations platform. The repository keeps the 
 
 - `frontend/` — Next.js UI and typed API client
 - `backend/` — FastAPI API, authorization and domain services
-- `firebase/` — Cloud SQL migrations, policies, seed data and tenant-isolation tests
+- `firebase/` — Firestore security rules and future data-model artifacts
 - `packages/shared/` — generated/shared API artifacts belong here
 
 ## Local development
 
 1. Copy `frontend/.env.example` and `backend/.env.example` to local `.env` files, then configure Firebase Authentication and your Google Cloud project.
-2. Apply the SQL files in `firebase/migrations/` to a development Cloud SQL for PostgreSQL instance.
+2. Deploy the Firestore security rules with `firebase deploy --only firestore:rules --project buildlens-20261018`.
 3. Run the API: `cd backend; python -m venv .venv; .venv\\Scripts\\pip install -e .[dev]; uvicorn app.main:app --reload --port 8000`.
 4. Run the UI: `cd frontend; npm install; npm run dev`.
 
@@ -35,6 +35,6 @@ The workspace now includes the connected field-to-management loop:
 - installable PWA shell with a visible offline mutation queue
 - source-grounded AI project briefings with a deterministic fallback
 
-Apply `firebase/migrations/202609290001_operational_workflows.sql` before using these modules. Gemini configuration is optional; without it, the briefing endpoint remains available using deterministic project metrics.
+Cloud Firestore starts with browser access denied. Enable Firebase Authentication and tenant-scoped rules before adding client data access. Gemini configuration is optional; without it, the briefing endpoint remains available using deterministic project metrics.
 
 RBAC expansion and role-adaptive screens are intentionally deferred; existing authentication and organization scoping remain in place.

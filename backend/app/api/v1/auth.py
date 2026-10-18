@@ -20,6 +20,17 @@ class SessionContext(BaseModel):
 @router.get("/me", response_model=SessionContext)
 async def me(user: CurrentUser = Depends(get_current_user), settings: Settings = Depends(get_settings)):
     assert user.organization_id is not None
+    if settings.auth_disabled:
+        return SessionContext(
+            user_id=user.id,
+            email=user.email,
+            organization_id=user.organization_id,
+            role_id=None,
+            permissions=sorted(user.permissions),
+            full_name="Local preview",
+            employee_code="BL-LOCAL",
+            role_name="Preview",
+        )
     params = {"organization_id": f"eq.{user.organization_id}", "user_id": f"eq.{user.id}", "select": "full_name,employee_code", "limit": "1"}
     async with httpx.AsyncClient(timeout=5) as client:
         response = await client.get(f"{settings.cloud_run_data_api_url.rstrip('/')}/api/v1/employees", params=params, headers={"X-Internal-Token": settings.cloud_run_data_api_secret_key})

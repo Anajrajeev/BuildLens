@@ -62,7 +62,7 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method || "GET").toUpperCase();
-  if (!process.env.NEXT_PUBLIC_API_URL) {
+  if (process.env.NEXT_PUBLIC_APP_PREVIEW === "true" || !process.env.NEXT_PUBLIC_API_URL) {
     return emptyResponse(path) as T;
   }
   if (

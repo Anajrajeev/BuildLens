@@ -3,6 +3,7 @@
 import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import "@/lib/firebase";
 import BrandLogo from "@/components/brand-logo";
 import WorkflowBoard from "@/components/workflow-board";
 import { OperationsModule } from "@/components/operations-modules";

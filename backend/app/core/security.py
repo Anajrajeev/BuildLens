@@ -80,6 +80,13 @@ async def get_current_user(
     request: Request = None,
     settings: Settings = Depends(get_settings),
 ) -> CurrentUser:
+    if settings.auth_disabled:
+        return CurrentUser(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+            email="local@buildlens.dev",
+            organization_id=UUID("00000000-0000-0000-0000-000000000002"),
+            permissions=frozenset({"task.write", "villa.read.all"}),
+        )
     if credentials is None:
         raise api_error("AUTH_REQUIRED", "Authentication is required.", 401)
     try:

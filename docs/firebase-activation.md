@@ -30,7 +30,7 @@ Never send service credentials to the browser or commit either local file.
 ## Apply and validate
 
 1. Create a Firebase project and enable Email/Password authentication.
-2. Create a Cloud SQL for PostgreSQL instance and apply `firebase/migrations/` in version order.
+2. Create the Firestore database in `asia-south1` and deploy `firebase/firestore.rules`.
 3. Deploy the API to Cloud Run with a service account and Secret Manager-backed configuration.
 4. Create development Firebase users, then add their Firebase UIDs as `organization_members` with a configured role.
 4. Assign role permissions, project/villa assignments, and then run the RLS tests.
