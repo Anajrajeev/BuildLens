@@ -21,11 +21,15 @@ class PlatformService:
         return await self.repository.list(table, self.org(user), **kwargs)
 
     async def create(self, user: CurrentUser, table: str, payload: dict[str, Any], request_id: str | None) -> dict[str, Any]:
+        if not ({'project.write', 'task.write'} & user.permissions):
+            raise api_error('FORBIDDEN', 'Write permission is required.', 403)
         record = await self.repository.create(table, self.org(user), payload)
         await self.repository.audit(self.org(user), user.id, f"{table.upper()}_CREATED", table, record.get("id"), record, request_id)
         return record
 
     async def update(self, user: CurrentUser, table: str, record_id: UUID, payload: dict[str, Any], request_id: str | None) -> dict[str, Any]:
+        if not ({'project.write', 'task.write'} & user.permissions):
+            raise api_error('FORBIDDEN', 'Write permission is required.', 403)
         try:
             record = await self.repository.update(table, self.org(user), record_id, payload)
         except LookupError:

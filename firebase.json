@@ -1,4 +1,13 @@
 {
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "BuildLens",
+        "supportEmail": "anajrajeev@gmail.com"
+      }
+    }
+  },
   "firestore": {
     "rules": "firebase/firestore.rules"
   }

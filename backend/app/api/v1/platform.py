@@ -2,11 +2,9 @@ from datetime import date, datetime, timezone
 from typing import Any, Literal
 from uuid import UUID
 
-import httpx
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
-from app.core.config import Settings, get_settings
 from app.core.errors import api_error
 from app.core.security import CurrentUser, get_current_user
 from app.repositories.platform_repository import PlatformRepository
@@ -167,11 +165,6 @@ class HandoverUpdate(BaseModel):
     status: Literal["NOT_READY", "IN_REVIEW", "READY", "CUSTOMER_INSPECTION", "HANDED_OVER"]
     readiness_score: float = Field(ge=0, le=100)
     notes: str | None = Field(default=None, max_length=4000)
-
-
-class BriefingRequest(BaseModel):
-    project_id: UUID | None = None
-    question: str = Field(default="What needs attention today?", min_length=2, max_length=1000)
 
 
 class ChecklistTemplateCreate(BaseModel):
@@ -699,33 +692,6 @@ async def create_handover_item(handover_id: UUID, payload: HandoverItemCreate, r
 async def update_handover_item(item_id: UUID, payload: HandoverItemUpdate, request: Request, user: CurrentUser = Depends(get_current_user)):
     values = {**body(payload), "completed_at": datetime.now(timezone.utc).isoformat() if payload.status in {"READY", "ACCEPTED"} else None, "completed_by": str(user.id) if payload.status in {"READY", "ACCEPTED"} else None}
     return await service.update(user, "handover_items", item_id, values, request.headers.get("X-Request-ID"))
-
-
-@router.post("/ai/briefing")
-async def ai_briefing(payload: BriefingRequest, request: Request, user: CurrentUser = Depends(get_current_user), settings: Settings = Depends(get_settings)):
-    context, deterministic = await service.deterministic_briefing(user, payload.project_id)
-    answer = deterministic
-    mode = "rules"
-    model = None
-    if settings.gemini_api_key:
-        prompt = f"User question: {payload.question}\nOperational context: {context}\nProvide a concise site operations briefing. Cite figures from the context. Never invent facts, approvals, or completed work."
-        try:
-            async with httpx.AsyncClient(timeout=45) as client:
-                response = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent?key={settings.gemini_api_key}",
-                    json={"system_instruction": {"parts": [{"text": "You are BuildLens's construction operations analyst. Use only the supplied operational context. Identify risks, owners to confirm, and next actions. Human approval is required for every operational change."}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": {"maxOutputTokens": 700}},
-                )
-                response.raise_for_status()
-            result = response.json()
-            texts = [part.get("text", "") for candidate in result.get("candidates", []) for part in candidate.get("content", {}).get("parts", [])]
-            if texts:
-                answer = "\n".join(texts)
-                mode = "gemini"
-                model = result.get("model", settings.gemini_model)
-        except (httpx.HTTPError, KeyError, TypeError, ValueError):
-            mode = "rules-fallback"
-    run = await service.create(user, "ai_runs", {"project_id": str(payload.project_id) if payload.project_id else None, "run_type": "OPERATIONS_BRIEFING", "question": payload.question, "answer": answer, "model": model or "deterministic-v1", "citations": context["metrics"], "created_by": str(user.id)}, request.headers.get("X-Request-ID"))
-    return {"answer": answer, "mode": mode, "model": model, "metrics": context["metrics"], "run_id": run["id"]}
 
 
 class VillaStateUpload(BaseModel):

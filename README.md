@@ -1,8 +1,8 @@
 # BuildLens
 
-Secure, multi-tenant construction operations and engineering intelligence platform. BuildLens connects field execution, multi-phase finishing schedules, quality governance, supply chain, and executive leadership into a unified operational loop.
+Construction operations workspace for the BuildLens hackathon. BuildLens connects field execution, multi-phase finishing schedules, quality governance, supply chain, and executive leadership into a unified operational loop.
 
-The repository separates the Next.js client, FastAPI business layer, and database schema.
+The repository separates the Next.js client, FastAPI business layer, and Firestore-backed data access. No deployment platform is configured in this repository.
 
 **Source repository:** [github.com/Anajrajeev/BuildLens](https://github.com/Anajrajeev/BuildLens)
 
@@ -23,7 +23,7 @@ BuildLens/
 │   ├── app/repositories/   # Repository layer for platform, project, and task persistence
 │   ├── app/services/       # Business domain logic (platform aggregation, workflow, AI briefing)
 │   └── tests/              # Pytest test suite (health, platform, workflow, and RBAC enforcement)
-├── firebase/               # Firestore security rules and seed SQL scripts
+├── firebase/               # Firestore security rules and historical SQL migration artifacts
 └── docs/                   # Architectural reference and system documentation
 ```
 
@@ -50,7 +50,8 @@ The workspace organizes 14 connected operational modules across four functional 
 ### 1. Overview
 - **Dashboard**: Real-time project KPIs, progress roll-ups, attention signals (overdue tasks, blocked items, open snags, low inventory), and mutation audit records.
 - **Today**: Field agenda, task progression, team assignments, dependencies, and live task timer actions.
-- **AI Briefing**: Source-grounded construction intelligence briefings powered by Gemini (`gemini-2.5-flash`) with a deterministic metric fallback.
+- **AI project intelligence**: Morning site briefing, schedule-risk radar, and evidence-grounded project Q&A. Responses cite project records and fall back to deterministic results when Gemini is unavailable.
+- **AI drafts**: Daily reports, vendor follow-ups, snag descriptions, and handover notes are drafts only; users review and approve every mutation.
 
 ### 2. Execution
 - **Villas**: Unit registry, status uploads, defect flagging, and multi-phase finishing schedules.
@@ -115,8 +116,11 @@ python -m venv .venv
 # source .venv/bin/activate
 
 pip install -e .[dev]
-cp .env.example .env
-uvicorn app.main:app --reload --port 8000
+# Configure backend/.env with DATA_BACKEND=firestore, FIREBASE_PROJECT_ID,
+# and GEMINI_KEY. Keep credentials in ignored local files.
+node ../scripts/firebase-local-credentials.cjs
+python ../scripts/bootstrap-firestore.py
+uvicorn app.main:app --reload --port 8101
 ```
 
 Run backend tests:
@@ -137,7 +141,10 @@ The UI will be accessible at `http://localhost:3000`.
 
 ### 3. Firestore Rules
 
-Deploy Firestore security rules if using Firebase Authentication:
+The browser accesses data only through FastAPI; Firebase Authentication is used for sign-in. For local development, sign in with Firebase CLI before creating the gitignored local credential file:
 ```bash
-firebase deploy --only firestore:rules --project <your-project-id>
+firebase login
+node scripts/firebase-local-credentials.cjs
 ```
+
+Set `NEXT_PUBLIC_API_URL=http://localhost:8101` in `frontend/.env.local` before starting the UI.

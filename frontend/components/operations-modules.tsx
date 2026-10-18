@@ -2,6 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { IntelligencePanel } from './project-intelligence';
 import {
   Badge,
   Button,
@@ -53,11 +54,13 @@ const formatDate = (value: unknown) =>
 export function OperationsModule({
   active,
   projectId,
+  projectName,
   villas,
   tasks,
 }: {
   active: ActiveModule;
   projectId?: string;
+  projectName?: string;
   villas: Villa[];
   tasks: Task[];
 }) {
@@ -77,7 +80,7 @@ export function OperationsModule({
       </div>
     );
   }
-  if (active === "Today") return <Agenda projectId={projectId} villas={villas} />;
+  if (active === "Today") return <div className="space-y-6"><IntelligencePanel surface="today" projectId={projectId} projectName={projectName} villas={villas} /><Agenda projectId={projectId} villas={villas} /></div>;
   if (active === "Quality")
     return <Quality projectId={projectId} villas={villas} tasks={tasks} />;
   if (active === "Materials") return <Materials projectId={projectId} />;
@@ -98,7 +101,7 @@ export function OperationsModule({
   if (active === "Handover")
     return <Handovers projectId={projectId} villas={villas} />;
   if (active === "Inbox") return <Inbox />;
-  return <AiBriefing projectId={projectId} />;
+  return <IntelligencePanel key={projectId} projectId={projectId} projectName={projectName} villas={villas} />;
 }
 
 function useItems(path: string) {
@@ -198,6 +201,7 @@ function Agenda({ projectId, villas }: { projectId: string; villas: Villa[] }) {
         }
       />
 
+      <IntelligencePanel projectId={projectId} surface="today" />
       <DataState
         data={data}
         emptyTitle="No field tasks scheduled"

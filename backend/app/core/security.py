@@ -21,7 +21,7 @@ DEFAULT_ORG_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 @dataclass(frozen=True)
 class CurrentUser:
-    id: UUID
+    id: UUID | str
     email: str | None
     organization_id: UUID | None = None
     role_id: UUID | None = None
@@ -107,6 +107,50 @@ async def get_current_user(
 
     if credentials is None:
         raise api_error("AUTH_REQUIRED", "Authentication is required.", 401)
+    if settings.data_backend == "firestore":
+        from firebase_admin import auth
+        from google.cloud.firestore_v1.base_query import FieldFilter
+        from app.core.firebase import firebase_app, database
+        try:
+            claims = await asyncio.to_thread(auth.verify_id_token, credentials.credentials, firebase_app(), check_revoked=True)
+        except Exception:
+            raise api_error("INVALID_TOKEN", "Sign in again to continue.", 401)
+        uid = claims['uid']
+        def context():
+            # Invitations are server-created. Only a verified identity may claim one.
+            if claims.get('email_verified') and claims.get('email'):
+                from google.cloud import firestore
+                import hashlib
+                db = database()
+                invite_id = hashlib.sha256(claims['email'].lower().encode()).hexdigest()
+                invite_ref = db.collection('organization_invitations').document(invite_id)
+                @firestore.transactional
+                def accept(transaction):
+                    invite = invite_ref.get(transaction=transaction)
+                    if not invite.exists or invite.to_dict().get('status') != 'PENDING':
+                        return
+                    data = invite.to_dict()
+                    member_ref = db.collection('organization_members').document(uid + '-' + data['organization_id'])
+                    transaction.set(member_ref, {'organization_id': data['organization_id'], 'user_id': uid, 'role_id': data['role_id'], 'status': 'ACTIVE'})
+                    transaction.update(invite_ref, {'status': 'ACCEPTED', 'accepted_by': uid})
+                accept(db.transaction())
+            query = database().collection('organization_members').where(filter=FieldFilter('user_id', '==', uid)).where(filter=FieldFilter('status', '==', 'ACTIVE'))
+            members = [doc.to_dict() for doc in query.stream(timeout=15)]
+            selected = request.headers.get('X-Organization-ID') if request else None
+            members = [m for m in members if not selected or m['organization_id'] == selected]
+            if len(members) != 1:
+                raise api_error('ORG_ACCESS_DENIED', 'An active organization membership is required. Select an organization if you belong to several.', 403)
+            member = members[0]
+            role = database().collection('roles').document(member['role_id']).get(timeout=15).to_dict() if member.get('role_id') else None
+            permissions = role.get('permissions', []) if role and role.get('organization_id') == member['organization_id'] else []
+            return CurrentUser(uid, claims.get('email'), UUID(member['organization_id']), UUID(member['role_id']) if member.get('role_id') else None, frozenset(permissions))
+        result = await asyncio.to_thread(context)
+        # Legacy screens expose whole-organization registers. Until they support
+        # assigned-project filtering, don't let a narrower role read those APIs.
+        path = request.url.path if request else ''
+        if 'project.read.all' not in result.permissions and not path.startswith(('/api/v1/ai/', '/api/v1/auth/')):
+            raise api_error('FORBIDDEN', 'This register requires organization-wide project access.', 403)
+        return result
     try:
         header = jwt.get_unverified_header(credentials.credentials)
         key_data = next(key for key in (await _jwks(settings))["keys"] if key.get("kid") == header.get("kid"))

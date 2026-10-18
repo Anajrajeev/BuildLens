@@ -12,6 +12,13 @@ class PlatformRepository:
 
     def __init__(self) -> None:
         self.settings = get_settings()
+        if self.settings.data_backend == "firestore":
+            from app.repositories.firestore_repository import FirestoreRepository
+            adapter = FirestoreRepository()
+            self.list = adapter.list
+            self.get = adapter.get
+            self.create = adapter.create
+            self.update = adapter.update
 
     def _use_seed_store(self) -> bool:
         return bool(self.settings.auth_disabled or not self.settings.cloud_run_data_api_url or "127.0.0.1:8001" in self.settings.cloud_run_data_api_url)

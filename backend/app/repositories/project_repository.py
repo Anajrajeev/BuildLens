@@ -19,6 +19,11 @@ class ProjectRepository:
         )
 
     async def list_for_organization(self, organization_id: UUID, page: int, page_size: int) -> tuple[list[dict], int]:
+        if self.settings.data_backend == "firestore":
+            from app.repositories.platform_repository import PlatformRepository
+            # The hackathon landing project is the first seeded project and has the live demo villas.
+            rows = await PlatformRepository().list("projects", organization_id, filters={"deleted_at": "is.null"}, order="created_at.asc", limit=10000)
+            return rows[(page - 1) * page_size : page * page_size], len(rows)
         if self._use_seed_store():
             rows = list_rows("projects", str(organization_id), limit=page_size)
             return rows, len(rows)
@@ -41,6 +46,9 @@ class ProjectRepository:
         return response.json(), int(count_header) if count_header.isdigit() else 0
 
     async def create(self, organization_id: UUID, payload: ProjectCreate) -> dict:
+        if self.settings.data_backend == "firestore":
+            from app.repositories.platform_repository import PlatformRepository
+            return await PlatformRepository().create("projects", organization_id, payload.model_dump(mode="json"))
         record = {**payload.model_dump(mode="json"), "organization_id": str(organization_id), "status": "ACTIVE"}
         if self._use_seed_store():
             return create_row("projects", record)

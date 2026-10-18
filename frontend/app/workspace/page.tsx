@@ -9,7 +9,6 @@ import {
   reconcileVillaPhases,
   VillaPhaseConfig,
 } from "@/lib/api";
-import "@/lib/firebase";
 import {
   AppRole,
   canRoleApproveRework,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/roles";
 import BrandLogo from "@/components/brand-logo";
 import WorkflowBoard from "@/components/workflow-board";
+import { IntelligencePanel } from "@/components/project-intelligence";
 import { OperationsModule } from "@/components/operations-modules";
 import {
   Badge,
@@ -209,6 +209,10 @@ export default function Workspace() {
     setRole(storedRole);
     if (storedRole === "Engineer") {
       setActive("Villas");
+    }
+    const requestedSection = new URLSearchParams(window.location.search).get("section");
+    if (requestedSection && navItems.includes(requestedSection as NavItem)) {
+      setActive(requestedSection as NavItem);
     }
     void load();
   }, [router]);
@@ -571,17 +575,20 @@ export default function Workspace() {
         {/* Page Content */}
         <main className="flex-1 w-full px-4 py-6 sm:px-6 lg:px-8 pb-20 lg:pb-10">
           {active === "Dashboard" ? (
-            <Dashboard
-              project={project}
-              villas={villas}
-              tasks={tasks}
-              onVillas={() => selectSection("Villas")}
-              onWorkSections={() => selectSection("Work sections")}
-              onAdd={() => setAddingVilla(true)}
-              canAdd={canAdd}
-              canApproveRework={canApproveRework}
-              onApproveRework={(villa) => setApprovingReworkVilla(villa)}
-            />
+            <div className="space-y-6">
+              {project && <IntelligencePanel surface="dashboard" projectId={project.id} projectName={project.name} villas={villas} />}
+              <Dashboard
+                project={project}
+                villas={villas}
+                tasks={tasks}
+                onVillas={() => selectSection("Villas")}
+                onWorkSections={() => selectSection("Work sections")}
+                onAdd={() => setAddingVilla(true)}
+                canAdd={canAdd}
+                canApproveRework={canApproveRework}
+                onApproveRework={(villa) => setApprovingReworkVilla(villa)}
+              />
+            </div>
           ) : active === "Villas" ? (
             <Villas
               villas={villas}
@@ -652,6 +659,7 @@ export default function Workspace() {
                   | "AI"
               }
               projectId={project?.id}
+              projectName={project?.name}
               villas={villas}
               tasks={tasks}
             />

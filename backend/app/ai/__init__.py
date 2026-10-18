@@ -1,0 +1,1 @@
+"""Permission-scoped construction intelligence."""

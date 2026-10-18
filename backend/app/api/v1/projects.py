@@ -46,6 +46,8 @@ class TaskSimpleCreate(BaseModel):
 
 def _use_seed_store() -> bool:
     settings = get_settings()
+    if settings.data_backend == "firestore":
+        return False
     return bool(
         settings.auth_disabled
         or not settings.cloud_run_data_api_url
@@ -74,6 +76,10 @@ async def create_project(payload: ProjectCreate, user: CurrentUser = Depends(get
 @router.get("/{project_id}/villas")
 async def list_villas(project_id: UUID, user: CurrentUser = Depends(get_current_user)):
     require_permission(user, Permission.VILLA_READ_ALL)
+    if get_settings().data_backend == "firestore":
+        from app.repositories.platform_repository import PlatformRepository
+        rows = await PlatformRepository().list("villas", user.organization_id, filters={"project_id": f"eq.{project_id}", "deleted_at": "is.null"}, order="villa_number.asc", limit=10000)
+        return {"items": rows}
     if _use_seed_store():
         rows = list_rows("villas", str(user.organization_id), filters={"project_id": f"eq.{project_id}"})
         if not rows:
@@ -118,6 +124,9 @@ async def create_villa(project_id: UUID, payload: VillaCreate, user: CurrentUser
     }
     if _use_seed_store():
         return create_row("villas", record)
+    if get_settings().data_backend == "firestore":
+        from app.repositories.platform_repository import PlatformRepository
+        return await PlatformRepository().create("villas", user.organization_id, {k: v for k, v in record.items() if k != "organization_id"})
     settings = get_settings()
     headers = {"X-Internal-Token": settings.cloud_run_data_api_secret_key, "Prefer": "return=representation"}
     async with httpx.AsyncClient(timeout=10) as client:
@@ -135,6 +144,10 @@ async def create_villa(project_id: UUID, payload: VillaCreate, user: CurrentUser
 @router.get("/{project_id}/tasks")
 async def list_project_tasks(project_id: UUID, user: CurrentUser = Depends(get_current_user)):
     require_permission(user, Permission.TASK_READ)
+    if get_settings().data_backend == "firestore":
+        from app.repositories.platform_repository import PlatformRepository
+        rows = await PlatformRepository().list("tasks", user.organization_id, filters={"project_id": f"eq.{project_id}"}, limit=10000)
+        return {"items": rows}
     if _use_seed_store():
         rows = list_rows("tasks", str(user.organization_id), filters={"project_id": f"eq.{project_id}"})
         if not rows:
@@ -170,4 +183,7 @@ async def create_project_task(
         "progress": payload.progress,
         "planned_end_at": payload.planned_end_at,
     }
+    if get_settings().data_backend == "firestore":
+        from app.repositories.platform_repository import PlatformRepository
+        return await PlatformRepository().create("tasks", user.organization_id, {k: v for k, v in record.items() if k != "organization_id"})
     return create_row("tasks", record)

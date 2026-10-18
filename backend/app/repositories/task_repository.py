@@ -21,6 +21,10 @@ class TaskRepository:
         return {"X-Internal-Token": self.settings.cloud_run_data_api_secret_key, "Prefer": "return=representation"}
 
     async def list(self, organization_id: UUID, page: int, page_size: int) -> tuple[list[dict], int]:
+        if self.settings.data_backend == "firestore":
+            from app.repositories.platform_repository import PlatformRepository
+            rows = await PlatformRepository().list("tasks", organization_id, order="planned_end_at.asc", limit=10000)
+            return rows[(page - 1) * page_size : page * page_size], len(rows)
         if self._use_seed_store():
             rows = list_rows("tasks", str(organization_id), limit=page_size)
             return rows, len(rows)
@@ -42,6 +46,9 @@ class TaskRepository:
         return response.json(), int(total) if total.isdigit() else 0
 
     async def belongs_to_organization(self, table: str, record_id: UUID, organization_id: UUID) -> bool:
+        if self.settings.data_backend == "firestore":
+            from app.repositories.platform_repository import PlatformRepository
+            return bool(await PlatformRepository().get(table, organization_id, record_id))
         if table not in {"projects", "villas", "tasks"}:
             raise ValueError("Unsupported scoped entity")
         if self._use_seed_store():
@@ -58,6 +65,10 @@ class TaskRepository:
         return bool(response.json())
 
     async def villa_belongs_to_project(self, villa_id: UUID, project_id: UUID, organization_id: UUID) -> bool:
+        if self.settings.data_backend == "firestore":
+            from app.repositories.platform_repository import PlatformRepository
+            row = await PlatformRepository().get("villas", organization_id, villa_id)
+            return bool(row and str(row.get("project_id")) == str(project_id))
         if self._use_seed_store():
             row = get_row("villas", str(villa_id))
             return bool(row and str(row.get("project_id")) == str(project_id))
@@ -78,6 +89,9 @@ class TaskRepository:
         return bool(response.json())
 
     async def create(self, organization_id: UUID, actor_id: UUID, payload: TaskCreate) -> dict:
+        if self.settings.data_backend == "firestore":
+            from app.repositories.platform_repository import PlatformRepository
+            return await PlatformRepository().create("tasks", organization_id, {**payload.model_dump(mode="json"), "created_by": str(actor_id)})
         record = {
             **payload.model_dump(mode="json"),
             "organization_id": str(organization_id),
@@ -98,6 +112,12 @@ class TaskRepository:
         return response.json()[0]
 
     async def create_timer(self, organization_id: UUID, task_id: UUID, actor_id: UUID, payload: TimerCreate) -> dict:
+        if self.settings.data_backend == "firestore":
+            from app.repositories.platform_repository import PlatformRepository
+            repo = PlatformRepository()
+            tracker = await repo.create("task_time_trackers", organization_id, {**payload.model_dump(mode="json"), "task_id": str(task_id), "created_by": str(actor_id), "status": "NOT_STARTED"})
+            await repo.create("task_time_events", organization_id, {"tracker_id": tracker["id"], "event_type": "CREATED", "actor_id": str(actor_id)})
+            return tracker
         tracker = {
             **payload.model_dump(mode="json"),
             "organization_id": str(organization_id),

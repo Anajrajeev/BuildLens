@@ -2,12 +2,12 @@ import time, uuid
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.v1 import auth, operations, people, platform, projects, tasks, workflow
+from app.api.v1 import auth, intelligence, operations, people, platform, projects, tasks, workflow
 from app.core.config import get_settings
 
 settings = get_settings()
 app = FastAPI(title="BuildLens API", version="0.1.0", openapi_url="/openapi.json", docs_url="/docs")
-app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=True, allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-BuildLens-Role"])
+app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=True, allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-BuildLens-Role", "X-Organization-ID"])
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
@@ -37,3 +37,4 @@ app.include_router(people.router, prefix="/api/v1")
 app.include_router(operations.router, prefix="/api/v1")
 app.include_router(platform.router, prefix="/api/v1")
 app.include_router(workflow.router, prefix="/api/v1")
+app.include_router(intelligence.router, prefix="/api/v1")

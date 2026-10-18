@@ -105,13 +105,12 @@ async def update_workflow(
         limit=1,
     )
     latest = max(previous, key=lambda r: int(r.get("revision", 0))) if previous else None
-    if not has_task_write and has_rework_approve:
-        if not latest or latest.get("status") != "REWORK_REQUIRED":
-            raise api_error(
-                "FORBIDDEN",
-                "Manager role can only approve activities currently flagged as REWORK_REQUIRED.",
-                403,
-            )
+    if not has_task_write and has_rework_approve and (not latest or latest.get("status") != "REWORK_REQUIRED"):
+        raise api_error(
+            "FORBIDDEN",
+            "Manager role can only approve activities currently flagged as REWORK_REQUIRED.",
+            403,
+        )
     if payload.revision != (int(latest["revision"]) if latest else 0) + 1:
         raise api_error("WORKFLOW_CONFLICT", "This activity changed. Refresh before saving again.", 409)
     try:

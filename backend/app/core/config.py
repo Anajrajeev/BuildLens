@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,9 +11,13 @@ class Settings(BaseSettings):
     jwt_audience: str = "authenticated"
     jwt_issuer: str = ""
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
-    gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
-    auth_disabled: bool = True
+    gemini_api_key: str = Field(default="", validation_alias=AliasChoices("GEMINI_API_KEY", "GEMINI_KEY", "gemini_api_key"))
+    gemini_model: str = "gemini-3.8-flash"
+    auth_disabled: bool = False
+    data_backend: str = "firestore"
+    firebase_project_id: str = "buildlens-20261018"
+    firebase_credentials_file: str = ""
+    site_timezone: str = "Asia/Kolkata"
 
     @property
     def allowed_origins(self) -> list[str]:

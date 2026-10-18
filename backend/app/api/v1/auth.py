@@ -9,7 +9,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class SessionContext(BaseModel):
-    user_id: UUID
+    user_id: UUID | str
     email: str | None
     organization_id: UUID
     role_id: UUID | None
@@ -33,6 +33,13 @@ async def me(user: CurrentUser = Depends(get_current_user), settings: Settings =
             employee_code=user.employee_code or "BL-LOCAL",
             role_name=user.role_name or "Director",
         )
+    if settings.data_backend == 'firestore':
+        from app.repositories.platform_repository import PlatformRepository
+        repo = PlatformRepository()
+        records = await repo.list('employees', user.organization_id, filters={'user_id': f'eq.{user.id}'}, limit=1)
+        employee = records[0] if records else {}
+        role = await repo.get('roles', user.organization_id, user.role_id) if user.role_id else {}
+        return SessionContext(user_id=user.id, email=user.email, organization_id=user.organization_id, role_id=user.role_id, permissions=sorted(user.permissions), full_name=employee.get('full_name'), employee_code=employee.get('employee_code'), role_name=(role or {}).get('name'))
     params = {"organization_id": f"eq.{user.organization_id}", "user_id": f"eq.{user.id}", "select": "full_name,employee_code", "limit": "1"}
     async with httpx.AsyncClient(timeout=5) as client:
         response = await client.get(

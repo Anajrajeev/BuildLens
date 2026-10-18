@@ -1897,11 +1897,13 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method || "GET").toUpperCase();
+  const isAI = path.startsWith("/ai/");
   if (
     typeof navigator !== "undefined" &&
     !navigator.onLine &&
     method !== "GET"
   ) {
+    if (isAI) throw new APIError("ONLINE_REQUIRED", "Reconnect before generating or approving project intelligence drafts.");
     const queued = queueMutation(path, init);
     return { queued: true, client_mutation_id: queued.id } as T;
   }
@@ -1909,10 +1911,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await send(path, init);
   } catch {
+    if (isAI) throw new APIError("AI_CONNECTION_FAILED", "Project intelligence requires the live API. Reconnect and retry; no generated project facts were substituted.");
     return handleLocalRequest(path, init) as T;
   }
   if (!response.ok) {
     if (response.status === 401 || response.status === 404 || response.status >= 500) {
+      if (isAI) throw new APIError("AI_REQUEST_FAILED", "The live intelligence request failed. Retry when the API is available.");
       return handleLocalRequest(path, init) as T;
     }
     const body = await response.json().catch(() => null);
