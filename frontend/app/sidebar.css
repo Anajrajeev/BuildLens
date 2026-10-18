@@ -1,0 +1,26 @@
+/* Screenshot-matched workspace navigation, isolated from page styles. */
+.ops .ops-side { background: #134e4a; box-shadow: none; display: flex; flex: 0 0 292px; flex-direction: column; width: 292px; height: 100dvh; min-height: 0; overflow: hidden; padding: clamp(12px, 2.2dvh, 20px) 20px 16px 5px; position: sticky; top: 0; }
+.ops-side::before { display: none; }
+.ops-side .sidebar-logo { margin: 0 10px; }
+.ops-side .project-switcher { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; display: grid; gap: 4px; flex: 0 0 auto; margin: clamp(14px, 3dvh, 27px) 0 clamp(10px, 2dvh, 18px); padding: clamp(10px, 1.55dvh, 14px); }
+.ops-side .project-switcher > span { color: #99f6e4; font-size: 9px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
+.ops-side .project-switcher b { color: #fff; font-size: 13px; line-height: 1.35; }
+.ops-side .project-switcher small { color: #ccfbf1; font-size: 10px; letter-spacing: .04em; }
+.ops-side nav { display: grid; flex: 0 0 auto; gap: 0; min-height: 0; overflow: visible; }
+.ops-side .nav-section { display: grid; gap: clamp(1px, .33dvh, 3px); padding-bottom: clamp(4px, 1.1dvh, 10px); }
+.ops-side .nav-section + .nav-section { border-top: 1px solid rgba(255,255,255,.09); padding-top: clamp(5px, 1.33dvh, 12px); }
+.ops-side .nav-section > span { color: #78bdb2; font-size: 8px; font-weight: 850; letter-spacing: .14em; padding: 0 12px 5px; text-transform: uppercase; }
+.ops-side nav button { align-items: center; background: transparent; border: 0; border-radius: 9px; color: #d5f5ee; cursor: pointer; display: flex; font-size: 12px; font-weight: 600; gap: 12px; margin: 0; height: clamp(22px, calc((100dvh - 380px) / 14), 36px); min-height: 0; padding: 0 12px; text-align: left; transition: background .16s ease, color .16s ease, transform .16s ease; width: 100%; }
+.ops-side nav button::before { display: none; }
+.ops-side nav button:hover { background: rgba(255,255,255,.07); color: #fff; transform: none; }
+.ops-side nav button.selected { background: #fff; box-shadow: none; color: #134e4a; }
+.ops-side nav button.ai-nav { background: linear-gradient(100deg, rgba(45,212,191,.2), rgba(20,184,166,.08)); border: 1px solid rgba(153,246,228,.28); color: #fff; margin: clamp(2px, .44dvh, 4px) 0 clamp(3px, .88dvh, 8px); }
+.ops-side nav button.ai-nav:hover { background: linear-gradient(100deg, rgba(45,212,191,.3), rgba(20,184,166,.14)); }
+.ops-side nav button.ai-nav.selected { background: linear-gradient(100deg, #fff, #e6fffa); border-color: #99f6e4; color: #134e4a; }
+.ops-side nav button.ai-nav .nav-glyph { color: #5eead4; }
+.ops-side nav button.ai-nav.selected .nav-glyph { color: #0f766e; }
+.ops-side nav button.selected .nav-glyph { color: #0f766e; }
+
+@media (max-width: 800px) {
+  .ops .ops-side { display: none; }
+}

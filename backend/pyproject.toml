@@ -1,0 +1,20 @@
+[project]
+name = "buildlens-api"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115", "uvicorn[standard]>=0.34", "pydantic-settings>=2.7", "python-jose[cryptography]>=3.3", "httpx>=0.28"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.25", "ruff>=0.9"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["api*", "tests*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.ruff.lint]
+# FastAPI dependency injection intentionally uses calls in defaults. Import
+# layout is left compatible with the compact style of the existing codebase.
+ignore = ["B008", "BLE001", "I001", "UP017", "FURB162"]

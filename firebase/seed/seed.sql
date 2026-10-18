@@ -1,0 +1,9 @@
+-- Run only against a local/development project after an authenticated demo user exists.
+insert into public.organizations (id,name,slug) values ('00000000-0000-0000-0000-000000000001','Green Valley Construction','green-valley') on conflict do nothing;
+insert into public.projects (organization_id,name,project_code,location,status,target_completion_date) values ('00000000-0000-0000-0000-000000000001','Green Valley Villas','GVV-2026','Bengaluru','ACTIVE','2027-06-30') on conflict do nothing;
+insert into public.villas (organization_id,project_id,villa_number,plot_number,block,phase,villa_type,status,target_handover_date)
+select '00000000-0000-0000-0000-000000000001', p.id, lpad(gs::text, '2', '0'), 'P-' || gs, case when gs <= 12 then 'A' else 'B' end, 'Phase 1', case when gs % 3 = 0 then 'Type C' when gs % 2 = 0 then 'Type B' else 'Type A' end, case when gs <= 16 then 'IN_PROGRESS' else 'PLANNING' end, date '2027-06-30'
+from public.projects p cross join generate_series(1,24) gs where p.project_code = 'GVV-2026' on conflict do nothing;
+insert into public.work_sections (organization_id,name) values ('00000000-0000-0000-0000-000000000001','Flooring'),('00000000-0000-0000-0000-000000000001','Painting'),('00000000-0000-0000-0000-000000000001','Windows'),('00000000-0000-0000-0000-000000000001','Doors'),('00000000-0000-0000-0000-000000000001','MS Work'),('00000000-0000-0000-0000-000000000001','Staircase & Railing'),('00000000-0000-0000-0000-000000000001','Cleaning') on conflict do nothing;
+-- Assign real Cloud SQL Auth users to these roles after creating them in development.
+insert into public.roles (organization_id,name,description) values ('00000000-0000-0000-0000-000000000001','Director','Organization-wide operational visibility'),('00000000-0000-0000-0000-000000000001','Project Manager','Assigned project visibility'),('00000000-0000-0000-0000-000000000001','Worker','Assigned work only') on conflict do nothing;

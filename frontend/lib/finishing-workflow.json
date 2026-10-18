@@ -1,0 +1,1459 @@
+{
+  "source": "FINISHING ACTIVITY ELLEGENZA  final.xlsx",
+  "phases": [
+    "Services & waterproofing",
+    "Interior base & flooring",
+    "External works",
+    "Finishes & joinery",
+    "Fixtures & commissioning",
+    "Snagging & handover"
+  ],
+  "activities": [
+    {
+      "id": "elle-001",
+      "order": 1,
+      "name": "Coping Granite Works of Window, Balcony and Parapet wall",
+      "duration": 12,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A3:F3"
+    },
+    {
+      "id": "elle-002",
+      "order": 2,
+      "name": "GF Plumbing Wall Work, CPVC Pressure Test & Wall Pipe Packing",
+      "duration": 7,
+      "phase": 0,
+      "remarks": "Marking checking = 01 Day, Cutting & Chipping = 02 Days, CPVC Pipeline works = 02 Days, Pressure Testing = 01 day [ Depends on Pressure Testing Failure}, WallPipe Levelling & Packing = 01 Day. Depends on Site Condition & Clearance",
+      "source": "Sheet1!A4:F4"
+    },
+    {
+      "id": "elle-003",
+      "order": 3,
+      "name": "GF Floor and wall tile marking",
+      "duration": 2,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A5:F5"
+    },
+    {
+      "id": "elle-004",
+      "order": 4,
+      "name": "GF Floor PVC Work ,Slope and Leakage test",
+      "duration": 2,
+      "phase": 0,
+      "remarks": "Depends on Floor Tile Pattern marking and wll tile Bull marking and checking and clearance for Floor Trap Loacation & Linear Grating location",
+      "source": "Sheet1!A6:F6"
+    },
+    {
+      "id": "elle-005",
+      "order": 5,
+      "name": "GF Soil Filing In Toilet",
+      "duration": 8,
+      "phase": 0,
+      "remarks": "Soil Back filling & Consolidation",
+      "source": "Sheet1!A7:F7"
+    },
+    {
+      "id": "elle-006",
+      "order": 6,
+      "name": "GF PCC",
+      "duration": 1,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A8:F8"
+    },
+    {
+      "id": "elle-007",
+      "order": 7,
+      "name": "GF Waterproofing",
+      "duration": 12,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A9:F9"
+    },
+    {
+      "id": "elle-008",
+      "order": 8,
+      "name": "FF Plumbing Wall Work, CPVC Pressure Test & Wall Pipe Packing",
+      "duration": 9,
+      "phase": 0,
+      "remarks": "Marking checking = 01 Day, Cutting & Chipping = 03 Days, CPVC Pipeline works = 02 Days, Pressure Testing = 02 days [ Depends on Pressure Testing Failure}, WallPipe Levelling & Packing = 01 Day. Depends on Site Condition & Clearance",
+      "source": "Sheet1!A10:F10"
+    },
+    {
+      "id": "elle-009",
+      "order": 9,
+      "name": "FF Plumbing PVC Work, Slope and Leakage Test",
+      "duration": 3,
+      "phase": 0,
+      "remarks": "Depends on Floor Tile Pattern marking and wll tile Bull marking and checking and clearance for Floor Trap Loacation & Linear Grating location [ Depends on Site Condition ]",
+      "source": "Sheet1!A11:F11"
+    },
+    {
+      "id": "elle-010",
+      "order": 10,
+      "name": "FF Toilet Waterproofing",
+      "duration": 18,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A12:F12"
+    },
+    {
+      "id": "elle-011",
+      "order": 11,
+      "name": "FF Floor & Wall Tile Marking",
+      "duration": 2,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A13:F13"
+    },
+    {
+      "id": "elle-012",
+      "order": 12,
+      "name": "FF Cinder Filling",
+      "duration": 1,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A14:F14"
+    },
+    {
+      "id": "elle-013",
+      "order": 13,
+      "name": "SF Plumbing Wall Work, CPVC Pressure Test & Wall Pipe Packing",
+      "duration": 3,
+      "phase": 0,
+      "remarks": "Marking checking , Cutting & Chipping = 01 Days, CPVC Pipeline works = 01 Days, Pressure Testing = 01 day [ Depends on Pressure Testing Failure}, WallPipe Levelling & Packing = 01 Day. Depends on Site Condition & Clearance [ Depends on Site Condition ]",
+      "source": "Sheet1!A15:F15"
+    },
+    {
+      "id": "elle-014",
+      "order": 14,
+      "name": "SF Toilet Waterproofing",
+      "duration": 18,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A16:F16"
+    },
+    {
+      "id": "elle-015",
+      "order": 15,
+      "name": "SF Floor and wall tile marking",
+      "duration": 1,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A17:F17"
+    },
+    {
+      "id": "elle-016",
+      "order": 16,
+      "name": "SF Plumbing PVC Work, lope & leakage test",
+      "duration": 1,
+      "phase": 0,
+      "remarks": "Depends on Floor Tile Pattern marking and wll tile Bull marking and checking and clearance for Floor Trap Loacation & Linear Grating location [ Depends on Site Condition ]",
+      "source": "Sheet1!A18:F18"
+    },
+    {
+      "id": "elle-017",
+      "order": 17,
+      "name": "SF Cinder Filling",
+      "duration": 1,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A19:F19"
+    },
+    {
+      "id": "elle-018",
+      "order": 18,
+      "name": "SF Open terrace Plumbing Work",
+      "duration": 2,
+      "phase": 0,
+      "remarks": "MS Bracket fixing in Alliingment,  CPVC & PVC Pipeline laying with Clamping [ Depends on Site Condition ]",
+      "source": "Sheet1!A20:F20"
+    },
+    {
+      "id": "elle-019",
+      "order": 19,
+      "name": "SF Open terrace Waterproofing",
+      "duration": 18,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A21:F21"
+    },
+    {
+      "id": "elle-020",
+      "order": 20,
+      "name": "SHR Plumbing Work",
+      "duration": 4,
+      "phase": 0,
+      "remarks": "MS Bracket fixing in Alliingment, OHT Shifting & Errection, CPVC Pipeline laying with Clamping, OHT & Pressure Pump Connection [ Depends on Site Condition ]",
+      "source": "Sheet1!A22:F22"
+    },
+    {
+      "id": "elle-021",
+      "order": 21,
+      "name": "SHR Waterproofing",
+      "duration": 18,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A23:F23"
+    },
+    {
+      "id": "elle-022",
+      "order": 22,
+      "name": "MS Works Pergola",
+      "duration": 7,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A24:F24"
+    },
+    {
+      "id": "elle-023",
+      "order": 23,
+      "name": "MS Staircase works",
+      "duration": 10,
+      "phase": 0,
+      "remarks": null,
+      "source": "Sheet1!A25:F25"
+    },
+    {
+      "id": "elle-024",
+      "order": 24,
+      "name": "GF Electrical Conduiting",
+      "duration": 5,
+      "phase": 1,
+      "remarks": "SUBJECTED TO CLEARANCE",
+      "source": "Sheet1!A26:F26"
+    },
+    {
+      "id": "elle-025",
+      "order": 25,
+      "name": "GF Wall & Ceiling Gypsum Plastering",
+      "duration": 15,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A27:F27"
+    },
+    {
+      "id": "elle-026",
+      "order": 26,
+      "name": "GF Dadoing",
+      "duration": 5,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A28:F28"
+    },
+    {
+      "id": "elle-027",
+      "order": 27,
+      "name": "GF Marble & Tiles Flooring",
+      "duration": 12,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A29:F29"
+    },
+    {
+      "id": "elle-028",
+      "order": 28,
+      "name": "GF Screed",
+      "duration": null,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A30:F30"
+    },
+    {
+      "id": "elle-029",
+      "order": 29,
+      "name": "FF Electrical Conduiting",
+      "duration": 5,
+      "phase": 1,
+      "remarks": "SUBJECTED TO CLEARANCE",
+      "source": "Sheet1!A31:F31"
+    },
+    {
+      "id": "elle-030",
+      "order": 30,
+      "name": "FF Wall & Ceiling Gypsum Plastering",
+      "duration": 15,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A32:F32"
+    },
+    {
+      "id": "elle-031",
+      "order": 31,
+      "name": "FF Dadoing",
+      "duration": 7,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A33:F33"
+    },
+    {
+      "id": "elle-032",
+      "order": 32,
+      "name": "FF Marble & Tiles Flooring",
+      "duration": 12,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A34:F34"
+    },
+    {
+      "id": "elle-033",
+      "order": 33,
+      "name": "FF Screed",
+      "duration": null,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A35:F35"
+    },
+    {
+      "id": "elle-034",
+      "order": 34,
+      "name": "SF Electrical Conduiting",
+      "duration": 3,
+      "phase": 1,
+      "remarks": "SUBJECTED TO CLEARANCE",
+      "source": "Sheet1!A36:F36"
+    },
+    {
+      "id": "elle-035",
+      "order": 35,
+      "name": "SF Wall & Ceiling Gypsum Plastering",
+      "duration": 15,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A37:F37"
+    },
+    {
+      "id": "elle-036",
+      "order": 36,
+      "name": "SF Screed",
+      "duration": null,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A38:F38"
+    },
+    {
+      "id": "elle-037",
+      "order": 37,
+      "name": "SF Open Terrace Dadoing & Flooring",
+      "duration": 7,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A39:F39"
+    },
+    {
+      "id": "elle-038",
+      "order": 38,
+      "name": "SF Dadoing",
+      "duration": 2,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A40:F40"
+    },
+    {
+      "id": "elle-039",
+      "order": 39,
+      "name": "SF Marble & Tiles Flooring",
+      "duration": 3,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A41:F41"
+    },
+    {
+      "id": "elle-040",
+      "order": 40,
+      "name": "GF to SF Staircase Flooring",
+      "duration": 7,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A42:F42"
+    },
+    {
+      "id": "elle-041",
+      "order": 41,
+      "name": "SHR & Open Terrace Screed",
+      "duration": null,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A43:F43"
+    },
+    {
+      "id": "elle-042",
+      "order": 42,
+      "name": "Shaft Plumbing Works",
+      "duration": 12,
+      "phase": 1,
+      "remarks": "Bracket Fixing, GP2 Packing, CPVC & PVC Pipeline works, Rain Water Pipeline work with Filter Fixing, Pipeline Clamping with allignment. [ Depends on Site Condition ]",
+      "source": "Sheet1!A44:F44"
+    },
+    {
+      "id": "elle-043",
+      "order": 43,
+      "name": "SHR Flooring",
+      "duration": 5,
+      "phase": 1,
+      "remarks": null,
+      "source": "Sheet1!A45:F45"
+    },
+    {
+      "id": "elle-044",
+      "order": 44,
+      "name": "Compound Wall",
+      "duration": 30,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A46:F46"
+    },
+    {
+      "id": "elle-045",
+      "order": 45,
+      "name": "Soil Filling",
+      "duration": 7,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A47:F47"
+    },
+    {
+      "id": "elle-046",
+      "order": 46,
+      "name": "External Plumbing Work",
+      "duration": 8,
+      "phase": 2,
+      "remarks": "Excavation, Chamber PCC, Chamber Brick work, CPVC & PVC Pipeline works with Concrete Pedestal, Chamber Cover Fixing, Back Yard Rain Water Pipeline connection to Storm Water Chamber [ Depends on Site Condition ]",
+      "source": "Sheet1!A48:F48"
+    },
+    {
+      "id": "elle-047",
+      "order": 47,
+      "name": "Soil Consolidation & Levelling",
+      "duration": 7,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A49:F49"
+    },
+    {
+      "id": "elle-048",
+      "order": 48,
+      "name": "Plinth Protection PCC",
+      "duration": 5,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A50:F50"
+    },
+    {
+      "id": "elle-049",
+      "order": 49,
+      "name": "Car Poarch Concrete 1",
+      "duration": 3,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A51:F51"
+    },
+    {
+      "id": "elle-050",
+      "order": 50,
+      "name": "Car Poarch Concrete 2",
+      "duration": 3,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A52:F52"
+    },
+    {
+      "id": "elle-051",
+      "order": 51,
+      "name": "Kerb Stone and Pavers fixing",
+      "duration": 9,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A53:F53"
+    },
+    {
+      "id": "elle-052",
+      "order": 52,
+      "name": "Car Poarch & Plinth Protection Flooring Works",
+      "duration": 5,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A54:F54"
+    },
+    {
+      "id": "elle-053",
+      "order": 53,
+      "name": "Infra Granite Works",
+      "duration": 6,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A55:F55"
+    },
+    {
+      "id": "elle-054",
+      "order": 54,
+      "name": "Front Elevation Cladding",
+      "duration": 3,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A56:F56"
+    },
+    {
+      "id": "elle-055",
+      "order": 55,
+      "name": "Front Granizia",
+      "duration": 2,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A57:F57"
+    },
+    {
+      "id": "elle-056",
+      "order": 56,
+      "name": "External Primer",
+      "duration": 2,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A58:F58"
+    },
+    {
+      "id": "elle-057",
+      "order": 57,
+      "name": "MS Railing Work",
+      "duration": null,
+      "phase": 2,
+      "remarks": null,
+      "source": "Sheet1!A59:F59"
+    },
+    {
+      "id": "elle-058",
+      "order": 58,
+      "name": "1st Internal Primer",
+      "duration": 5,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A60:F60"
+    },
+    {
+      "id": "elle-059",
+      "order": 59,
+      "name": "1st Coat Wall Putty",
+      "duration": 10,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A61:F61"
+    },
+    {
+      "id": "elle-060",
+      "order": 60,
+      "name": "2nd Coat Wall Putty",
+      "duration": 2,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A62:F62"
+    },
+    {
+      "id": "elle-061",
+      "order": 61,
+      "name": "2nd Internal Primer",
+      "duration": 2,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A63:F63"
+    },
+    {
+      "id": "elle-062",
+      "order": 62,
+      "name": "1st Coat Paint",
+      "duration": 2,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A64:F64"
+    },
+    {
+      "id": "elle-063",
+      "order": 63,
+      "name": "1st Snagging",
+      "duration": 2,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A65:F65"
+    },
+    {
+      "id": "elle-064",
+      "order": 64,
+      "name": "Door's Installation",
+      "duration": 6,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A66:F66"
+    },
+    {
+      "id": "elle-065",
+      "order": 65,
+      "name": "Windows & Ventilator Installation",
+      "duration": 10,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A67:F67"
+    },
+    {
+      "id": "elle-066",
+      "order": 66,
+      "name": "External Texture Works & 1st Coat Paint.",
+      "duration": 10,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A68:F68"
+    },
+    {
+      "id": "elle-067",
+      "order": 67,
+      "name": "Electrical Wiring",
+      "duration": 6,
+      "phase": 3,
+      "remarks": "SUBJECTED TO CLEARANCE",
+      "source": "Sheet1!A69:F69"
+    },
+    {
+      "id": "elle-068",
+      "order": 68,
+      "name": "Switch Plate Fixing",
+      "duration": 4,
+      "phase": 3,
+      "remarks": "SUBJECTED TO CLEARANCE",
+      "source": "Sheet1!A70:F70"
+    },
+    {
+      "id": "elle-069",
+      "order": 69,
+      "name": "2nd Snagging",
+      "duration": 3,
+      "phase": 3,
+      "remarks": null,
+      "source": "Sheet1!A71:F71"
+    },
+    {
+      "id": "elle-070",
+      "order": 70,
+      "name": "Deep Cleaning",
+      "duration": 15,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A72:F72"
+    },
+    {
+      "id": "elle-071",
+      "order": 71,
+      "name": "Grouting",
+      "duration": 7,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A73:F73"
+    },
+    {
+      "id": "elle-072",
+      "order": 72,
+      "name": "Internal Final Coat Paint",
+      "duration": 5,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A74:F74"
+    },
+    {
+      "id": "elle-073",
+      "order": 73,
+      "name": "Wooden Flooring",
+      "duration": 5,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A75:F75"
+    },
+    {
+      "id": "elle-074",
+      "order": 74,
+      "name": "External Final Painting",
+      "duration": 2,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A76:F76"
+    },
+    {
+      "id": "elle-075",
+      "order": 75,
+      "name": "External False Ceiling Works",
+      "duration": null,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A77:F77"
+    },
+    {
+      "id": "elle-076",
+      "order": 76,
+      "name": "Balcony Glass Railing",
+      "duration": 3,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A78:F78"
+    },
+    {
+      "id": "elle-077",
+      "order": 77,
+      "name": "Staircase Glass Railing",
+      "duration": 5,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A79:F79"
+    },
+    {
+      "id": "elle-078",
+      "order": 78,
+      "name": "Switch Plate Cover Fixing",
+      "duration": 1,
+      "phase": 4,
+      "remarks": "SUBJECTED TO CLEARANCE",
+      "source": "Sheet1!A80:F80"
+    },
+    {
+      "id": "elle-079",
+      "order": 79,
+      "name": "Shaft Louvers Installation",
+      "duration": 10,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A81:F81"
+    },
+    {
+      "id": "elle-080",
+      "order": 80,
+      "name": "Pergola Glass",
+      "duration": 2,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A82:F82"
+    },
+    {
+      "id": "elle-081",
+      "order": 81,
+      "name": "Skylight Glass",
+      "duration": 2,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A83:F83"
+    },
+    {
+      "id": "elle-082",
+      "order": 82,
+      "name": "Shower Glass Fixing",
+      "duration": 2,
+      "phase": 4,
+      "remarks": null,
+      "source": "Sheet1!A84:F84"
+    },
+    {
+      "id": "elle-083",
+      "order": 83,
+      "name": "CP & Sanitary Fixing",
+      "duration": 3,
+      "phase": 4,
+      "remarks": "Plumbing Points Grouting , CP & Sanitary Fittings shifting and fixing",
+      "source": "Sheet1!A85:F85"
+    },
+    {
+      "id": "elle-084",
+      "order": 84,
+      "name": "Plumbing & Electrical Commissioning",
+      "duration": 2,
+      "phase": 4,
+      "remarks": "Checking for any leakages and Applying Silicon",
+      "source": "Sheet1!A86:F86"
+    },
+    {
+      "id": "elle-085",
+      "order": 85,
+      "name": "Joint Filling Works",
+      "duration": 4,
+      "phase": 5,
+      "remarks": null,
+      "source": "Sheet1!A87:F87"
+    },
+    {
+      "id": "elle-086",
+      "order": 86,
+      "name": "Landscaping",
+      "duration": 4,
+      "phase": 5,
+      "remarks": null,
+      "source": "Sheet1!A88:F88"
+    },
+    {
+      "id": "elle-087",
+      "order": 87,
+      "name": "Final Cleaning",
+      "duration": 5,
+      "phase": 5,
+      "remarks": null,
+      "source": "Sheet1!A89:F89"
+    },
+    {
+      "id": "elle-088",
+      "order": 88,
+      "name": "Final Snagging",
+      "duration": 4,
+      "phase": 5,
+      "remarks": null,
+      "source": "Sheet1!A90:F90"
+    },
+    {
+      "id": "elle-089",
+      "order": 89,
+      "name": "CRM Snagging",
+      "duration": 3,
+      "phase": 5,
+      "remarks": null,
+      "source": "Sheet1!A91:F91"
+    }
+  ],
+  "schedule": [
+    {
+      "row": 4,
+      "name": "Copping Granite on prarpet",
+      "bands": [
+        {
+          "start": 1,
+          "end": 12
+        }
+      ],
+      "annotations": [
+        "R4: 12 D"
+      ],
+      "source": "Sheet2!A4:EW4"
+    },
+    {
+      "row": 5,
+      "name": "waterproofing",
+      "bands": [
+        {
+          "start": 1,
+          "end": 24
+        }
+      ],
+      "annotations": [
+        "AE5: 24 D"
+      ],
+      "source": "Sheet2!A5:EW5"
+    },
+    {
+      "row": 6,
+      "name": "Plumbing",
+      "bands": [
+        {
+          "start": 1,
+          "end": 23
+        }
+      ],
+      "annotations": [
+        "AC6: 23 D"
+      ],
+      "source": "Sheet2!A6:EW6"
+    },
+    {
+      "row": 7,
+      "name": "Cinder filling + concrete +screed concrete in toilet",
+      "bands": [
+        {
+          "start": 18,
+          "end": 60
+        }
+      ],
+      "annotations": [
+        "BO7: 42 D"
+      ],
+      "source": "Sheet2!A7:EW7"
+    },
+    {
+      "row": 8,
+      "name": "GF Gypsum",
+      "bands": [
+        {
+          "start": 12,
+          "end": 30
+        }
+      ],
+      "annotations": [
+        "AK8: 18 D"
+      ],
+      "source": "Sheet2!A8:EW8"
+    },
+    {
+      "row": 9,
+      "name": "FF Gypsum",
+      "bands": [
+        {
+          "start": 31,
+          "end": 50
+        }
+      ],
+      "annotations": [
+        "BD9: 20 D"
+      ],
+      "source": "Sheet2!A9:EW9"
+    },
+    {
+      "row": 10,
+      "name": "SF  Gypsum",
+      "bands": [
+        {
+          "start": 51,
+          "end": 65
+        }
+      ],
+      "annotations": [
+        "BS10: 15 D"
+      ],
+      "source": "Sheet2!A10:EW10"
+    },
+    {
+      "row": 11,
+      "name": "Marble laying/ POLISHING",
+      "bands": [
+        {
+          "start": 22,
+          "end": 45
+        },
+        {
+          "start": 61,
+          "end": 66
+        },
+        {
+          "start": 88,
+          "end": 100
+        }
+      ],
+      "annotations": [
+        "AY11: 24 D",
+        "BR11: 6 D"
+      ],
+      "source": "Sheet2!A11:EW11"
+    },
+    {
+      "row": 12,
+      "name": "RailingParapet top granite",
+      "bands": [
+        {
+          "start": 1,
+          "end": 15
+        }
+      ],
+      "annotations": [
+        "U12: 15 D"
+      ],
+      "source": "Sheet2!A12:EW12"
+    },
+    {
+      "row": 13,
+      "name": "GF Screed for tiles",
+      "bands": [
+        {
+          "start": 28,
+          "end": 62
+        },
+        {
+          "start": 75,
+          "end": 75
+        }
+      ],
+      "annotations": [
+        "BY13: 35 D"
+      ],
+      "source": "Sheet2!A13:EW13"
+    },
+    {
+      "row": 14,
+      "name": "GF Screed for tiles",
+      "bands": [
+        {
+          "start": 30,
+          "end": 64
+        },
+        {
+          "start": 75,
+          "end": 75
+        }
+      ],
+      "annotations": [
+        "BY14: 35 D "
+      ],
+      "source": "Sheet2!A14:EW14"
+    },
+    {
+      "row": 15,
+      "name": "GF Screed for tiles",
+      "bands": [
+        {
+          "start": 34,
+          "end": 68
+        }
+      ],
+      "annotations": [
+        "BY15: 35",
+        "BZ15: D"
+      ],
+      "source": "Sheet2!A15:EW15"
+    },
+    {
+      "row": 16,
+      "name": "GF Screed for tiles",
+      "bands": [
+        {
+          "start": 38,
+          "end": 72
+        }
+      ],
+      "annotations": [
+        "BY16: 35",
+        "BZ16: D"
+      ],
+      "source": "Sheet2!A16:EW16"
+    },
+    {
+      "row": 17,
+      "name": "GF Dado work",
+      "bands": [
+        {
+          "start": 28,
+          "end": 35
+        }
+      ],
+      "annotations": [
+        "AQ17: 8 D"
+      ],
+      "source": "Sheet2!A17:EW17"
+    },
+    {
+      "row": 18,
+      "name": "FF Dado work",
+      "bands": [
+        {
+          "start": 36,
+          "end": 43
+        }
+      ],
+      "annotations": [
+        "AW18: 8 D"
+      ],
+      "source": "Sheet2!A18:EW18"
+    },
+    {
+      "row": 19,
+      "name": "SF Dado work",
+      "bands": [
+        {
+          "start": 44,
+          "end": 49
+        }
+      ],
+      "annotations": [
+        "BC19: 6 D"
+      ],
+      "source": "Sheet2!A19:EW19"
+    },
+    {
+      "row": 20,
+      "name": "GF Floor tiles",
+      "bands": [
+        {
+          "start": 63,
+          "end": 69
+        }
+      ],
+      "annotations": [
+        "BX20: 7   D"
+      ],
+      "source": "Sheet2!A20:EW20"
+    },
+    {
+      "row": 21,
+      "name": "FF Floor tiles",
+      "bands": [
+        {
+          "start": 70,
+          "end": 82
+        }
+      ],
+      "annotations": [
+        "CL21: 13 D"
+      ],
+      "source": "Sheet2!A21:EW21"
+    },
+    {
+      "row": 22,
+      "name": "SF Floor tiles",
+      "bands": [
+        {
+          "start": 83,
+          "end": 90
+        }
+      ],
+      "annotations": [
+        "CR22: 8 D"
+      ],
+      "source": "Sheet2!A22:EW22"
+    },
+    {
+      "row": 23,
+      "name": "TOILET CELING MR BOARD",
+      "bands": [
+        {
+          "start": 49,
+          "end": 60
+        }
+      ],
+      "annotations": [
+        "BL23: 12 D"
+      ],
+      "source": "Sheet2!A23:EW23"
+    },
+    {
+      "row": 24,
+      "name": "INTERNAL PAINTING",
+      "bands": [],
+      "annotations": [],
+      "source": "Sheet2!A24:EW24"
+    },
+    {
+      "row": 25,
+      "name": "PRIMER, PUTTY AND 1 COAT PAINT",
+      "bands": [
+        {
+          "start": 45,
+          "end": 87
+        }
+      ],
+      "annotations": [
+        "CR25: 43 D"
+      ],
+      "source": "Sheet2!A25:EW25"
+    },
+    {
+      "row": 26,
+      "name": "EXTERNAL PAINTING",
+      "bands": [],
+      "annotations": [],
+      "source": "Sheet2!A26:EW26"
+    },
+    {
+      "row": 27,
+      "name": "PRIMER, TEXTURE AND 1 COAT PAINT",
+      "bands": [
+        {
+          "start": 45,
+          "end": 60
+        }
+      ],
+      "annotations": [
+        "BO27: 16 D"
+      ],
+      "source": "Sheet2!A27:EW27"
+    },
+    {
+      "row": 28,
+      "name": "ELECTRICAL WIRING AND SWITCH PLATE FIXING",
+      "bands": [
+        {
+          "start": 61,
+          "end": 68
+        },
+        {
+          "start": 88,
+          "end": 91
+        },
+        {
+          "start": 129,
+          "end": 130
+        }
+      ],
+      "annotations": [
+        "BT28: 8 D",
+        "CQ28: 4 D",
+        "ED28: 2 D"
+      ],
+      "source": "Sheet2!A28:EW28"
+    },
+    {
+      "row": 29,
+      "name": "FRONT ELEVATION GRANEZEA AND DADOING",
+      "bands": [
+        {
+          "start": 61,
+          "end": 70
+        }
+      ],
+      "annotations": [
+        "BX29: 10 D"
+      ],
+      "source": "Sheet2!A29:EW29"
+    },
+    {
+      "row": 30,
+      "name": "MS PERGOLA",
+      "bands": [
+        {
+          "start": 1,
+          "end": 7
+        }
+      ],
+      "annotations": [
+        "N30: 7 D"
+      ],
+      "source": "Sheet2!A30:EW30"
+    },
+    {
+      "row": 31,
+      "name": "MS  STAIR CASE",
+      "bands": [
+        {
+          "start": 26,
+          "end": 35
+        }
+      ],
+      "annotations": [
+        "AP31: 10 D"
+      ],
+      "source": "Sheet2!A31:EW31"
+    },
+    {
+      "row": 32,
+      "name": "MS BALCONY RAILING",
+      "bands": [
+        {
+          "start": 15,
+          "end": 35
+        }
+      ],
+      "annotations": [
+        "AP32: 21 D"
+      ],
+      "source": "Sheet2!A32:EW32"
+    },
+    {
+      "row": 33,
+      "name": "MS  LUVERS",
+      "bands": [
+        {
+          "start": 58,
+          "end": 70
+        }
+      ],
+      "annotations": [
+        "BX33: 13 D"
+      ],
+      "source": "Sheet2!A33:EW33"
+    },
+    {
+      "row": 34,
+      "name": "DOOR FIXING",
+      "bands": [
+        {
+          "start": 88,
+          "end": 97
+        }
+      ],
+      "annotations": [
+        "CY34: 10 D"
+      ],
+      "source": "Sheet2!A34:EW34"
+    },
+    {
+      "row": 35,
+      "name": "WINDOW FIXING",
+      "bands": [
+        {
+          "start": 88,
+          "end": 102
+        }
+      ],
+      "annotations": [
+        "DD35: 15 D "
+      ],
+      "source": "Sheet2!A35:EW35"
+    },
+    {
+      "row": 36,
+      "name": "STAIRCASE SS RAILING",
+      "bands": [
+        {
+          "start": 102,
+          "end": 107
+        }
+      ],
+      "annotations": [
+        "DI36: 6 D"
+      ],
+      "source": "Sheet2!A36:EW36"
+    },
+    {
+      "row": 37,
+      "name": "FRONT ELEVATION RAILING",
+      "bands": [
+        {
+          "start": 106,
+          "end": 109
+        }
+      ],
+      "annotations": [
+        "DI37: 4 D"
+      ],
+      "source": "Sheet2!A37:EW37"
+    },
+    {
+      "row": 38,
+      "name": "Front Door CNC jally and aluminium loovers and circle",
+      "bands": [
+        {
+          "start": 88,
+          "end": 95
+        }
+      ],
+      "annotations": [
+        "CU38: 8 D"
+      ],
+      "source": "Sheet2!A38:EW38"
+    },
+    {
+      "row": 39,
+      "name": "INFRA WORK",
+      "bands": [
+        {
+          "start": 61,
+          "end": 90
+        }
+      ],
+      "annotations": [
+        "CP39: 30 D"
+      ],
+      "source": "Sheet2!A39:EW39"
+    },
+    {
+      "row": 40,
+      "name": "VOX CELING WORK",
+      "bands": [
+        {
+          "start": 52,
+          "end": 66
+        }
+      ],
+      "annotations": [
+        "BR40: 15 D"
+      ],
+      "source": "Sheet2!A40:EW40"
+    },
+    {
+      "row": 41,
+      "name": "Pergola Glass Fixing",
+      "bands": [
+        {
+          "start": 96,
+          "end": 105
+        }
+      ],
+      "annotations": [
+        "DE41: 10 D"
+      ],
+      "source": "Sheet2!A41:EW41"
+    },
+    {
+      "row": 42,
+      "name": "CLEANING AND GROUTING",
+      "bands": [
+        {
+          "start": 110,
+          "end": 120
+        }
+      ],
+      "annotations": [
+        "DT42: 6 D"
+      ],
+      "source": "Sheet2!A42:EW42"
+    },
+    {
+      "row": 43,
+      "name": "FINAL PAINTING",
+      "bands": [
+        {
+          "start": 121,
+          "end": 130
+        }
+      ],
+      "annotations": [
+        "ED43: 6 D"
+      ],
+      "source": "Sheet2!A43:EW43"
+    },
+    {
+      "row": 44,
+      "name": "DEEP CLEANING",
+      "bands": [
+        {
+          "start": 131,
+          "end": 135
+        }
+      ],
+      "annotations": [
+        "EI44: 6 D"
+      ],
+      "source": "Sheet2!A44:EW44"
+    },
+    {
+      "row": 45,
+      "name": "LANDSCAPING",
+      "bands": [
+        {
+          "start": 121,
+          "end": 130
+        }
+      ],
+      "annotations": [
+        "ED45: 6 D"
+      ],
+      "source": "Sheet2!A45:EW45"
+    },
+    {
+      "row": 46,
+      "name": "CP FITTINGS",
+      "bands": [
+        {
+          "start": 136,
+          "end": 138
+        }
+      ],
+      "annotations": [
+        "EL46: 6 D"
+      ],
+      "source": "Sheet2!A46:EW46"
+    },
+    {
+      "row": 47,
+      "name": "FINAL SNAGGING",
+      "bands": [
+        {
+          "start": 139,
+          "end": 145
+        }
+      ],
+      "annotations": [
+        "ES47: 6 D"
+      ],
+      "source": "Sheet2!A47:EW47"
+    },
+    {
+      "row": 48,
+      "name": "Handing Over",
+      "bands": [
+        {
+          "start": 148,
+          "end": 149
+        }
+      ],
+      "annotations": [],
+      "source": "Sheet2!A48:EW48"
+    }
+  ]
+}
