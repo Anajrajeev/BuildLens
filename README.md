@@ -1,40 +1,143 @@
 # BuildLens
 
-Secure, multi-tenant construction operations platform. The repository keeps the Next.js client, FastAPI business layer, and Cloud SQL schema deliberately separate.
+Secure, multi-tenant construction operations and engineering intelligence platform. BuildLens connects field execution, multi-phase finishing schedules, quality governance, supply chain, and executive leadership into a unified operational loop.
 
-**Source repository:** [github.com/Anajrajeev/BuildLens](https://github.com/Anajrajeev/BuildLens). The production target is Google Cloud: Firebase Authentication, Cloud Run, Cloud SQL, Cloud Storage, and Gemini.
+The repository separates the Next.js client, FastAPI business layer, and database schema.
 
-## Layout
+**Source repository:** [github.com/Anajrajeev/BuildLens](https://github.com/Anajrajeev/BuildLens)
 
-- `frontend/` — Next.js UI and typed API client
-- `backend/` — FastAPI API, authorization and domain services
-- `firebase/` — Firestore security rules and future data-model artifacts
-- `packages/shared/` — generated/shared API artifacts belong here
+---
 
-## Local development
+## Architecture & Layout
 
-1. Copy `frontend/.env.example` and `backend/.env.example` to local `.env` files, then configure Firebase Authentication and your Google Cloud project.
-2. Deploy the Firestore security rules with `firebase deploy --only firestore:rules --project buildlens-20261018`.
-3. Run the API: `cd backend; python -m venv .venv; .venv\\Scripts\\pip install -e .[dev]; uvicorn app.main:app --reload --port 8000`.
-4. Run the UI: `cd frontend; npm install; npm run dev`.
+```
+BuildLens/
+├── frontend/               # Next.js 15 App Router UI, Tailwind CSS, PWA shell & typed API client
+│   ├── app/                # Next.js pages (/workspace, /workspace/profile, landing page, manifest)
+│   ├── components/         # Brand logo, workflow board, operational modules, and design system UI
+│   ├── lib/                # Typed API client, RBAC role definitions, and offline sync utilities
+│   └── public/             # PWA assets, service worker, and brand identity marks
+├── backend/                # FastAPI application, domain services, and permissions engine
+│   ├── app/api/v1/         # Versioned REST endpoints (auth, operations, people, platform, projects, workflow)
+│   ├── app/core/           # RBAC permissions, security dependencies, config, and seed data store
+│   ├── app/repositories/   # Repository layer for platform, project, and task persistence
+│   ├── app/services/       # Business domain logic (platform aggregation, workflow, AI briefing)
+│   └── tests/              # Pytest test suite (health, platform, workflow, and RBAC enforcement)
+├── firebase/               # Firestore security rules and seed SQL scripts
+└── docs/                   # Architectural reference and system documentation
+```
 
-The browser uses Firebase Authentication only. All operational writes pass through FastAPI on Cloud Run and use Cloud SQL service credentials.
+---
 
-## Operational modules
+## Role-Based Access Control (RBAC)
 
-The workspace now includes the connected field-to-management loop:
+BuildLens enforces granular, role-based authorization across the stack. The platform defines three distinct operational roles with strict permission boundaries:
 
-- Today agenda, task status, progress history, assignments, dependencies and timer actions
-- villa levels/rooms, quality inspections, reusable checklist templates and snag closure
-- daily reports, safety observations and corrective actions
-- materials, stock movements, suppliers, purchase orders and line items
-- vendor commitments and performance scorecards
-- WIR, drawing revisions/acknowledgements and document registration
-- handover packages and readiness items
-- live dashboards, exception reporting, notifications and immutable mutation audit records
-- installable PWA shell with a visible offline mutation queue
-- source-grounded AI project briefings with a deterministic fallback
+| Role | Badge | Key Responsibilities & Capabilities |
+| :--- | :--- | :--- |
+| **Director** | `Full Access` | **Executive Command**: Full unrestricted access across all 14 modules. Can register new villas, configure phase scheduling windows, manage personnel/roles, override site states, and approve rework holds. |
+| **Manager** | `Rework Approval` | **Quality & Governance**: Supervises quality gates and schedule remediation. Reviews flagged defects and unit notes, inspects site evidence, and formally approves rework to clear holds. Cannot upload raw field states. |
+| **Engineer** | `State Uploads` | **Field Operations**: On-site execution specialist. Uploads live villa states (`IN_PROGRESS`, `COMPLETED`, `BLOCKED`, `REWORK_REQUIRED`) in the Villas module, logs unit completion metrics, and flags defects. Cannot clear rework holds. |
 
-Cloud Firestore starts with browser access denied. Enable Firebase Authentication and tenant-scoped rules before adding client data access. Gemini configuration is optional; without it, the briefing endpoint remains available using deterministic project metrics.
+Authentication supports Firebase Authentication tokens or the development header `X-BuildLens-Role: Director | Manager | Engineer` for role-switching in preview mode.
 
-RBAC expansion and role-adaptive screens are intentionally deferred; existing authentication and organization scoping remain in place.
+---
+
+## Operational Modules
+
+The workspace organizes 14 connected operational modules across four functional groups:
+
+### 1. Overview
+- **Dashboard**: Real-time project KPIs, progress roll-ups, attention signals (overdue tasks, blocked items, open snags, low inventory), and mutation audit records.
+- **Today**: Field agenda, task progression, team assignments, dependencies, and live task timer actions.
+- **AI Briefing**: Source-grounded construction intelligence briefings powered by Gemini (`gemini-2.5-flash`) with a deterministic metric fallback.
+
+### 2. Execution
+- **Villas**: Unit registry, status uploads, defect flagging, and multi-phase finishing schedules.
+- **Work Sections**: Villa-level and room-level work breakdown structures, progress history, and task dependencies.
+- **People**: Organization directory, employee codes, role assignments, and permission profiles.
+- **Documents**: Work Inspection Requests (WIR), architectural and structural drawing revisions, and document registration.
+- **Reports**: Daily site logs, weather conditions, manpower counts, and work summaries.
+
+### 3. Supply Chain
+- **Materials**: Material catalog, real-time stock levels, low-inventory alerts, and stock movement logs.
+- **Procurement**: Purchase orders, itemized line items, delivery status tracking, and supplier matching.
+- **Vendors**: Subcontractor and vendor commitments, trade categorizations, and performance scorecards.
+
+### 4. Assurance
+- **Quality**: Inspections, reusable checklist templates, snag lists, and formal rework approval gates.
+- **Safety**: Safety observations, severity ratings, corrective actions, and site incident logs.
+- **Handover**: Unit readiness criteria, testing & commissioning records, and formal handover packages.
+
+---
+
+## Villa Phase Scheduling Engine
+
+BuildLens includes a multi-phase finishing schedule engine for villa delivery:
+
+1. **Services & waterproofing** (Days 1–35)
+2. **Interior base & flooring** (Days 10–65)
+3. **External works** (Days 20–95)
+4. **Finishes & joinery** (Days 45–115)
+5. **Fixtures & commissioning** (Days 85–138)
+6. **Snagging & handover** (Days 120–150)
+
+Phases support parallel execution or sequential dependencies with automatic day-window reconciliation. When rework is flagged on an active phase, formal Manager or Director approval is required before the unit or phase can transition to completion.
+
+---
+
+## Brand Identity
+
+The BuildLens brand identity features a modern geometric mark uniting:
+- **Build**: Upward-reaching architectural towers and structural facets.
+- **Lens**: Precision optical inspection aperture representing clarity and site verification.
+- **Palette**: Deep Architectural Teal (`#0f766e`, `#14b8a6`, `#0e272b`) designed via Nano Banana.
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- Python 3.11+
+- Git
+
+### 1. Backend Setup
+
+```bash
+cd backend
+python -m venv .venv
+
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+# source .venv/bin/activate
+
+pip install -e .[dev]
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
+
+Run backend tests:
+```bash
+pytest backend/tests
+```
+
+### 2. Frontend Setup
+
+```bash
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+The UI will be accessible at `http://localhost:3000`.
+
+### 3. Firestore Rules
+
+Deploy Firestore security rules if using Firebase Authentication:
+```bash
+firebase deploy --only firestore:rules --project <your-project-id>
+```
