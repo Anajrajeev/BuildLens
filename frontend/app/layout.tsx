@@ -19,7 +19,8 @@ export const metadata: Metadata = {
   title: "BuildLens — Construction Operations Platform",
   description: "Construction operations, organized.",
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f766e'/><text x='16' y='21' text-anchor='middle' font-family='monospace' font-weight='700' font-size='14' fill='white'>BL</text></svg>",
+    icon: "/brand/buildlens-mark.png",
+    apple: "/brand/buildlens-mark.png",
   },
 };
 

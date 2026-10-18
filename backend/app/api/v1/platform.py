@@ -726,3 +726,208 @@ async def ai_briefing(payload: BriefingRequest, request: Request, user: CurrentU
             mode = "rules-fallback"
     run = await service.create(user, "ai_runs", {"project_id": str(payload.project_id) if payload.project_id else None, "run_type": "OPERATIONS_BRIEFING", "question": payload.question, "answer": answer, "model": model or "deterministic-v1", "citations": context["metrics"], "created_by": str(user.id)}, request.headers.get("X-Request-ID"))
     return {"answer": answer, "mode": mode, "model": model, "metrics": context["metrics"], "run_id": run["id"]}
+
+
+class VillaStateUpload(BaseModel):
+    status: Literal["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "REWORK_REQUIRED", "COMPLETED"]
+    progress: int = Field(default=50, ge=0, le=100)
+    work_section: str = Field(min_length=2, max_length=200)
+    note: str = Field(min_length=1, max_length=2000)
+    evidence_file: str | None = None
+
+
+class VillaApproveRework(BaseModel):
+    next_status: Literal["IN_PROGRESS", "COMPLETED"] = "IN_PROGRESS"
+    progress: int = Field(default=70, ge=1, le=100)
+    note: str = Field(min_length=1, max_length=2000)
+
+
+class VillaEditPayload(BaseModel):
+    villa_number: str | None = None
+    block: str | None = None
+    villa_type: str | None = None
+    phases: list[dict[str, Any]] | None = None
+
+
+@router.post("/villas/{villa_id}/state")
+async def upload_villa_state(
+    villa_id: str,
+    payload: VillaStateUpload,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+):
+    from app.core.permissions import Permission, require_permission
+    from app.core.seed_store import get_row, update_row
+
+    require_permission(user, Permission.VILLA_STATE_UPLOAD)
+    villa = get_row("villas", villa_id)
+    if not villa:
+        raise api_error("NOT_FOUND", "Villa not found.", 404)
+
+    phases = villa.get("phases") or []
+    updated_phases = [
+        {**p, "status": payload.status}
+        if str(p.get("name", "")).lower() == payload.work_section.lower()
+        else p
+        for p in phases
+    ]
+    patch: dict[str, Any] = {
+        "status": payload.status,
+        "progress": 100 if payload.status == "COMPLETED" else (0 if payload.status == "NOT_STARTED" else payload.progress),
+        "work_section": payload.work_section,
+        "state_note": payload.note,
+        "phases": updated_phases,
+    }
+    if payload.evidence_file is not None:
+        patch["evidence_file"] = payload.evidence_file
+    if payload.status == "REWORK_REQUIRED":
+        patch["rework_approved_by"] = None
+
+    updated = update_row("villas", villa_id, patch)
+    await repository.audit(
+        service.org(user),
+        user.id,
+        "VILLA_STATE_UPLOADED",
+        "villas",
+        villa_id,
+        patch,
+        request.headers.get("X-Request-ID"),
+    )
+    return updated
+
+
+@router.post("/villas/{villa_id}/approve-rework")
+async def approve_villa_rework(
+    villa_id: str,
+    payload: VillaApproveRework,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+):
+    from app.core.permissions import Permission, require_permission
+    from app.core.seed_store import create_row, get_row, list_rows, update_row
+
+    require_permission(user, Permission.REWORK_APPROVE)
+    villa = get_row("villas", villa_id)
+    if not villa:
+        raise api_error("NOT_FOUND", "Villa not found.", 404)
+
+    role_label = user.role_name or "Manager"
+    phases = [
+        {**p, "status": "IN_PROGRESS"} if p.get("status") == "REWORK_REQUIRED" else p
+        for p in (villa.get("phases") or [])
+    ]
+    patch: dict[str, Any] = {
+        "status": payload.next_status,
+        "progress": 100 if payload.next_status == "COMPLETED" else payload.progress,
+        "state_note": payload.note,
+        "rework_approved_by": role_label,
+        "phases": phases,
+    }
+    updated = update_row("villas", villa_id, patch)
+
+    # Clear any active REWORK_REQUIRED workflow events for this villa
+    events = list_rows("villa_workflow_events", str(user.organization_id), filters={"villa_id": f"eq.{villa_id}"})
+    latest_by_act: dict[str, dict[str, Any]] = {}
+    for ev in events:
+        key = ev["activity_key"]
+        if key not in latest_by_act or int(ev.get("revision", 0)) >= int(latest_by_act[key].get("revision", 0)):
+            latest_by_act[key] = ev
+    for key, latest in latest_by_act.items():
+        if latest.get("status") == "REWORK_REQUIRED":
+            create_row(
+                "villa_workflow_events",
+                {
+                    "organization_id": str(user.organization_id),
+                    "project_id": villa["project_id"],
+                    "villa_id": villa_id,
+                    "activity_key": key,
+                    "revision": int(latest["revision"]) + 1,
+                    "status": "IN_PROGRESS",
+                    "progress": max(int(latest.get("progress") or 50), 65),
+                    "note": f"Rework approved by {role_label}: {payload.note}",
+                    "actor_id": str(user.id),
+                },
+            )
+
+    await repository.audit(
+        service.org(user),
+        user.id,
+        "VILLA_REWORK_APPROVED",
+        "villas",
+        villa_id,
+        patch,
+        request.headers.get("X-Request-ID"),
+    )
+    return updated
+
+
+@router.post("/villas/{villa_id}/edit")
+async def edit_villa_and_phases(
+    villa_id: str,
+    payload: VillaEditPayload,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+):
+    from app.core.seed_store import (
+        DEFAULT_PHASE_WINDOWS,
+        SCHEDULE_CONFIG,
+        get_row,
+        reconcile_villa_phases,
+        update_row,
+    )
+
+    if not ({"villa.write", "villa.state.upload", "rework.approve", "project.write"} & set(user.permissions)):
+        raise api_error("FORBIDDEN", "You do not have permission to edit villa phases.", 403)
+    villa = get_row("villas", villa_id)
+    if not villa:
+        raise api_error("NOT_FOUND", "Villa not found.", 404)
+
+    patch: dict[str, Any] = {}
+    if payload.villa_number:
+        patch["villa_number"] = payload.villa_number
+    if payload.block is not None:
+        patch["block"] = payload.block
+    if payload.villa_type is not None:
+        patch["villa_type"] = payload.villa_type
+    if payload.phases is not None:
+        reconciled = reconcile_villa_phases(payload.phases)
+        patch["phases"] = reconciled
+        base_names = {w["name"].lower() for w in DEFAULT_PHASE_WINDOWS}
+        custom_names = {cp.lower() for cp in SCHEDULE_CONFIG["customPhases"]}
+        for ph in reconciled:
+            pname = str(ph.get("name", "")).strip()
+            if pname and pname.lower() not in base_names and pname.lower() not in custom_names:
+                SCHEDULE_CONFIG["customPhases"].append(pname)
+                custom_names.add(pname.lower())
+                new_phase_idx = len(DEFAULT_PHASE_WINDOWS) + len(SCHEDULE_CONFIG["customPhases"]) - 1
+                ph["phaseIndex"] = new_phase_idx
+                act_id = f"custom-act-{len(SCHEDULE_CONFIG['customActivities']) + 1}"
+                SCHEDULE_CONFIG["customActivities"].append(
+                    {
+                        "id": act_id,
+                        "order": 89 + len(SCHEDULE_CONFIG["customActivities"]) + 1,
+                        "name": f"{pname} — Execution & QA Verification",
+                        "duration": ph["plannedDays"],
+                        "phase": new_phase_idx,
+                        "remarks": f"Linked from Villa {villa.get('villa_number')} phase configuration.",
+                        "source": "VILLA_PHASE",
+                    }
+                )
+                SCHEDULE_CONFIG["activityOverrides"][act_id] = {
+                    "duration": ph["plannedDays"],
+                    "startDay": ph["startDay"],
+                    "allowParallel": ph["allowParallel"],
+                }
+
+    updated = update_row("villas", villa_id, patch)
+    await repository.audit(
+        service.org(user),
+        user.id,
+        "VILLA_PHASES_UPDATED",
+        "villas",
+        villa_id,
+        patch,
+        request.headers.get("X-Request-ID"),
+    )
+    return updated
+

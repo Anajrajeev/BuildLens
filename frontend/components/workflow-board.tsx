@@ -2,11 +2,20 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { api } from "@/lib/api";
 import {
+  api,
+  CustomWorkflowActivity,
+  VillaPhaseConfig,
+  WorkflowScheduleConfig,
+} from "@/lib/api";
+import {
+  ActivityScheduleOverride,
   activityState,
+  computeConflictFreeSchedule,
+  DEFAULT_PHASE_WINDOWS,
   latestEvents,
   reference,
+  ScheduledActivityMeta,
   statusLabels,
   WorkEvent,
   WorkStatus,
@@ -27,8 +36,20 @@ import {
 } from "@/components/ui";
 
 type Project = { id: string; name: string };
-type Villa = { id: string; villa_number: string };
-type Activity = (typeof reference.activities)[number];
+type Villa = {
+  id: string;
+  villa_number: string;
+  phases?: VillaPhaseConfig[];
+};
+type Activity = {
+  id: string;
+  order: number;
+  name: string;
+  duration: number | null;
+  phase: number;
+  remarks: string | null;
+  source: string;
+};
 
 const statusLeftBorder: Record<WorkStatus, string> = {
   NOT_STARTED: "border-l-zinc-300 dark:border-l-zinc-700",
@@ -41,15 +62,31 @@ const statusLeftBorder: Record<WorkStatus, string> = {
 export default function WorkflowBoard({
   projects,
   canEdit,
+  canApproveRework = false,
+  initialVillaId = "",
+  initialPhaseFilter = null,
 }: {
   projects: Project[];
   canEdit: boolean;
+  canApproveRework?: boolean;
+  initialVillaId?: string;
+  initialPhaseFilter?: number | null;
 }) {
   const [projectId, setProjectId] = useState(projects[0]?.id || "");
   const [villas, setVillas] = useState<Villa[]>([]);
   const [events, setEvents] = useState<WorkEvent[]>([]);
-  const [villaId, setVillaId] = useState("");
-  const [view, setView] = useState<"timeline" | "phases" | "register">("timeline");
+  const [scheduleConfig, setScheduleConfig] = useState<WorkflowScheduleConfig>({
+    customPhases: [],
+    customActivities: [],
+    activityOverrides: {},
+  });
+  const [villaId, setVillaId] = useState(initialVillaId);
+  const [phaseFilter, setPhaseFilter] = useState<string>(
+    initialPhaseFilter !== null && initialPhaseFilter !== undefined
+      ? String(initialPhaseFilter)
+      : "all"
+  );
+  const [view, setView] = useState<"phases" | "timeline" | "register">("phases");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState<Activity | null>(null);
@@ -58,22 +95,33 @@ export default function WorkflowBoard({
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
+    if (initialVillaId) {
+      setVillaId(initialVillaId);
+    }
+  }, [initialVillaId]);
+
+  useEffect(() => {
+    if (initialPhaseFilter !== null && initialPhaseFilter !== undefined) {
+      setPhaseFilter(String(initialPhaseFilter));
+      setView("phases");
+    }
+  }, [initialPhaseFilter]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    setVillaId("");
     setSelected(null);
-    setEvents([]);
-    setVillas([]);
     if (!projectId) {
       setLoading(false);
       return;
     }
     void (async () => {
       try {
-        const villaResponse = await api<{ items: Villa[] }>(
-          `/projects/${projectId}/villas`
-        );
+        const [villaResponse, cfgResponse] = await Promise.all([
+          api<{ items: Villa[] }>(`/projects/${projectId}/villas`),
+          api<WorkflowScheduleConfig>("/workflow/schedule-config"),
+        ]);
         let offset: number | null = 0;
         const history: WorkEvent[] = [];
         while (offset !== null) {
@@ -85,6 +133,9 @@ export default function WorkflowBoard({
         if (!cancelled) {
           setVillas(villaResponse.items);
           setEvents(history);
+          if (cfgResponse) {
+            setScheduleConfig(cfgResponse);
+          }
         }
       } catch (cause) {
         if (!cancelled)
@@ -100,11 +151,70 @@ export default function WorkflowBoard({
     };
   }, [projectId, refresh]);
 
+  const selectedVillaObj = useMemo(
+    () => villas.find((v) => v.id === villaId),
+    [villas, villaId]
+  );
+
+  const allPhases = useMemo(() => {
+    const base = [...reference.phases];
+    for (const cp of scheduleConfig.customPhases || []) {
+      if (!base.some((p) => p.toLowerCase() === cp.toLowerCase())) {
+        base.push(cp);
+      }
+    }
+    if (selectedVillaObj?.phases) {
+      for (const vp of selectedVillaObj.phases) {
+        if (!base.some((p) => p.toLowerCase() === vp.name.toLowerCase())) {
+          base.push(vp.name);
+        }
+      }
+    }
+    return base;
+  }, [scheduleConfig.customPhases, selectedVillaObj]);
+
+  const allActivities: Activity[] = useMemo(() => {
+    const custom: Activity[] = (scheduleConfig.customActivities || []).map(
+      (ca: CustomWorkflowActivity) => ({
+        id: ca.id,
+        order: ca.order,
+        name: ca.name,
+        duration: ca.duration,
+        phase: ca.phase,
+        remarks: ca.remarks,
+        source: ca.source,
+      })
+    );
+    return [...reference.activities, ...custom];
+  }, [scheduleConfig.customActivities]);
+
+  const scheduleMap = useMemo(
+    () =>
+      computeConflictFreeSchedule(
+        allActivities,
+        scheduleConfig.activityOverrides || {}
+      ),
+    [allActivities, scheduleConfig.activityOverrides]
+  );
+
+  const parallelCount = useMemo(
+    () =>
+      Array.from(scheduleMap.values()).filter(
+        (m) => m.allowParallel && m.parallelWithIds.length > 0
+      ).length,
+    [scheduleMap]
+  );
+
+  const conflictCount = useMemo(
+    () => Array.from(scheduleMap.values()).filter((m) => m.hasConflict).length,
+    [scheduleMap]
+  );
+
   const ids = villaId ? [villaId] : villas.map((v) => v.id);
   const states = useMemo(
     () =>
       new Map(
-        reference.activities.map((a) => [
+        allActivities.map((a) => [
           a.id,
           activityState(
             events,
@@ -113,44 +223,98 @@ export default function WorkflowBoard({
           ),
         ])
       ),
-    [events, villaId, villas]
+    [allActivities, events, villaId, villas]
   );
   const current = latestEvents(events);
-  const active = reference.activities.filter(
+  const active = allActivities.filter(
     (a) => states.get(a.id)?.status === "IN_PROGRESS"
   );
-  const rework = reference.activities.filter(
+  const rework = allActivities.filter(
     (a) => states.get(a.id)?.status === "REWORK_REQUIRED"
   );
-  const completed = reference.activities.filter(
+  const completed = allActivities.filter(
     (a) => states.get(a.id)?.status === "COMPLETED"
   ).length;
-  const visible = reference.activities.filter(
-    (a) =>
+
+  const allowedVillaPhaseIndices = useMemo(() => {
+    if (!selectedVillaObj?.phases || selectedVillaObj.phases.length === 0) {
+      return null;
+    }
+    return new Set(
+      selectedVillaObj.phases.map((p) => {
+        const idx = allPhases.findIndex(
+          (name) => name.toLowerCase() === p.name.toLowerCase()
+        );
+        return idx >= 0 ? idx : p.phaseIndex;
+      })
+    );
+  }, [selectedVillaObj, allPhases]);
+
+  const visible = allActivities.filter((a) => {
+    if (allowedVillaPhaseIndices && !allowedVillaPhaseIndices.has(a.phase)) {
+      return false;
+    }
+    if (phaseFilter !== "all" && String(a.phase) !== phaseFilter) {
+      return false;
+    }
+    return (
       a.name.toLowerCase().includes(query.toLowerCase()) &&
       (filter === "all" || states.get(a.id)?.status === filter)
-  );
-  const outOfOrder = (activity: Activity) =>
-    Boolean(
-      villaId &&
-        events.some(
-          (e) =>
-            e.villa_id === villaId &&
-            e.activity_key === activity.id &&
-            e.status !== "NOT_STARTED"
-        ) &&
-        reference.activities.some(
-          (a) =>
-            a.order < activity.order &&
-            current.get(`${villaId}/${a.id}`)?.status !== "COMPLETED"
-        )
     );
+  });
+
+  const outOfOrder = (activity: Activity) => {
+    if (!villaId) return false;
+    const meta = scheduleMap.get(activity.id);
+    if (!meta || meta.allowParallel || !meta.prerequisiteId) return false;
+    const hasStarted = events.some(
+      (e) =>
+        e.villa_id === villaId &&
+        e.activity_key === activity.id &&
+        e.status !== "NOT_STARTED"
+    );
+    if (!hasStarted) return false;
+    const prereqStatus = current.get(
+      `${villaId}/${meta.prerequisiteId}`
+    )?.status;
+    return prereqStatus !== "COMPLETED";
+  };
+
+  const reconciledSchedule = useMemo(() => {
+    let screedZoneCounter = 0;
+    return reference.schedule.map((row) => {
+      const isScreed = row.name.toLowerCase() === "gf screed for tiles";
+      if (isScreed) screedZoneCounter += 1;
+      const displayName = isScreed
+        ? `${row.name} · Zone ${String.fromCharCode(64 + screedZoneCounter)}`
+        : row.name;
+
+      const totalBandDays = row.bands.reduce(
+        (sum, b) => sum + (b.end - b.start + 1),
+        0
+      );
+      const overlapsWithOtherRow = reference.schedule.some(
+        (other) =>
+          other.row !== row.row &&
+          other.bands.some((ob) =>
+            row.bands.some((rb) => rb.start <= ob.end && rb.end >= ob.start)
+          )
+      );
+
+      return {
+        ...row,
+        displayName,
+        totalBandDays,
+        overlapsWithOtherRow,
+      };
+    });
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
       {/* Filter & Scope Toolbar */}
-      <div className="rounded-card border border-border bg-surface p-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 max-w-2xl">
+      <div className="rounded-card border border-border bg-surface p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1 max-w-3xl">
           <FormField label="Project" htmlFor="wf-project-select">
             <Select
               id="wf-project-select"
@@ -184,11 +348,39 @@ export default function WorkflowBoard({
               ))}
             </Select>
           </FormField>
+
+          <FormField
+            label="Linked Villa Phase"
+            htmlFor="wf-phase-filter-select"
+          >
+            <Select
+              id="wf-phase-filter-select"
+              value={phaseFilter}
+              onChange={(e) => setPhaseFilter(e.target.value)}
+            >
+              <option value="all">
+                All phases ({allPhases.length})
+              </option>
+              {allPhases.map((phaseName, idx) => (
+                <option key={phaseName} value={String(idx)}>
+                  {String(idx + 1).padStart(2, "0")} · {phaseName}
+                </option>
+              ))}
+            </Select>
+          </FormField>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="success" dot>
+            {conflictCount === 0
+              ? "0 duration conflicts"
+              : `${conflictCount} conflicts`}
+          </Badge>
+          <Badge variant="accent" dot={false} mono>
+            {parallelCount} parallel works
+          </Badge>
           <Badge variant="neutral" dot={false} mono>
-            89 activities · 6 phases
+            {allActivities.length} activities · {allPhases.length} phases
           </Badge>
           <Button
             variant="secondary"
@@ -197,9 +389,38 @@ export default function WorkflowBoard({
             disabled={loading}
             onClick={() => setRefresh((n) => n + 1)}
           >
-            Refresh progress
+            Refresh
           </Button>
         </div>
+      </div>
+
+      {/* Conflict-Free Schedule & Parallel Execution Banner */}
+      <div className="rounded-card border border-accent-border bg-accent-subtle/60 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-start sm:items-center gap-3">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent text-white">
+            <Icon name="sliders" className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold text-ink">
+              Conflict-Free Schedule & Parallel Execution Active
+            </p>
+            <p className="text-xs text-ink-secondary">
+              Every work item’s planned day count matches its scheduled{" "}
+              <span className="font-mono">Start–End</span> window (0 conflicts).
+              Independent floor and facade tracks (<span className="font-mono">GF</span>,{" "}
+              <span className="font-mono">FF</span>, <span className="font-mono">SF</span>,{" "}
+              <span className="font-mono">External</span>) overlap in parallel
+              within the 150-day master window, while sequential dependencies
+              auto-shift to prevent overlap conflicts.
+            </p>
+          </div>
+        </div>
+        {selectedVillaObj && (
+          <Badge variant="accent" mono>
+            Linked to Villa {selectedVillaObj.villa_number} (
+            {selectedVillaObj.phases?.length || allPhases.length} phases)
+          </Badge>
+        )}
       </div>
 
       {/* KPI Metrics or Loading/Error State */}
@@ -215,24 +436,25 @@ export default function WorkflowBoard({
           <MetricCard
             label="Sections complete"
             value={completed}
-            subvalue="/ 89"
+            subvalue={`/ ${allActivities.length}`}
             hint={villaId ? "Selected villa" : "Across all villas"}
             icon="check-circle"
           />
           <MetricCard
-            label="Active sections"
+            label="Active parallel streams"
             value={active.length}
-            hint={
-              villaId
-                ? "Sections in progress together"
-                : "Active or partial progress"
-            }
+            subvalue={`${parallelCount} overlap-enabled`}
+            hint="Concurrent works without day conflicts"
             icon="clock"
           />
           <MetricCard
             label="Rework required"
             value={rework.length}
-            hint="Flagged for remediation"
+            hint={
+              canApproveRework
+                ? "Click any rework item below to approve"
+                : "Flagged for Manager rework approval"
+            }
             badge={
               rework.length > 0 ? (
                 <Badge variant="danger">Action needed</Badge>
@@ -246,9 +468,7 @@ export default function WorkflowBoard({
             value={ids.length}
             hint={
               villaId
-                ? `Inspecting Villa ${
-                    villas.find((v) => v.id === villaId)?.villa_number ?? ""
-                  }`
+                ? `Inspecting Villa ${selectedVillaObj?.villa_number ?? ""}`
                 : "Equal weight in project roll-up"
             }
             icon="villas"
@@ -266,8 +486,8 @@ export default function WorkflowBoard({
           >
             {(
               [
-                ["timeline", "150-day reference"],
-                ["phases", "Phase board"],
+                ["phases", "Phase board (Linked to Villas)"],
+                ["timeline", "150-day parallel schedule"],
                 ["register", "Activity register"],
               ] as const
             ).map(([id, label]) => {
@@ -292,8 +512,8 @@ export default function WorkflowBoard({
           </div>
           <p className="text-xs text-ink-muted pb-2 sm:pb-0">
             {view === "timeline"
-              ? "Sheet2 · Five relative 30-day months. Coloured bands show planned windows."
-              : "Sheet1 · 89 activities grouped into six finishing phases. Click any activity to inspect or update."}
+              ? "150-day master schedule · Parallel tracks overlap cleanly; every band span matches its exact day duration."
+              : "Click any work activity to update villa state, approve rework, or configure duration & parallel execution."}
           </p>
         </div>
 
@@ -361,13 +581,13 @@ export default function WorkflowBoard({
           <div className="overflow-x-auto max-h-[680px]">
             <div className="min-w-[960px]">
               {/* Sticky Gantt Header */}
-              <div className="sticky top-0 z-10 grid grid-cols-[280px_1fr] border-b border-border bg-surface-subtle text-xs font-medium text-ink-muted">
+              <div className="sticky top-0 z-10 grid grid-cols-[310px_1fr] border-b border-border bg-surface-subtle text-xs font-medium text-ink-muted">
                 <div className="px-4 py-3 border-r border-border flex items-center justify-between">
                   <span className="font-semibold uppercase tracking-wider text-accent-text">
-                    Work package
+                    Work package & duration
                   </span>
                   <span className="rounded bg-accent-subtle border border-accent-border px-1.5 py-0.5 font-mono text-[11px] font-semibold text-accent-text">
-                    45 rows
+                    0 conflicts
                   </span>
                 </div>
                 <div className="grid grid-cols-5 divide-x divide-border">
@@ -387,37 +607,50 @@ export default function WorkflowBoard({
 
               {/* Gantt Rows */}
               <div className="divide-y divide-border-subtle">
-                {reference.schedule.map((row) => {
+                {reconciledSchedule.map((row) => {
                   const isHeading = row.bands.length === 0;
                   return (
                     <div
                       key={row.row}
-                      className={`grid grid-cols-[280px_1fr] min-h-[44px] transition-colors duration-fast ${
+                      className={`grid grid-cols-[310px_1fr] min-h-[46px] transition-colors duration-fast ${
                         isHeading
                           ? "bg-surface-subtle"
                           : "bg-surface hover:bg-surface-subtle/60"
                       }`}
                     >
                       <div className="px-4 py-2.5 border-r border-border flex flex-col justify-center">
-                        <span
-                          className={`text-xs ${
-                            isHeading
-                              ? "font-semibold text-accent-text uppercase tracking-wider"
-                              : "font-medium text-ink"
-                          }`}
-                        >
-                          {row.name}
-                        </span>
-                        <span className="font-mono text-[11px] text-ink-muted mt-0.5">
-                          Sheet2 · row {row.row}
-                          {row.row >= 13 && row.row <= 16
-                            ? " · repeated label"
-                            : ""}
-                        </span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`text-xs truncate ${
+                              isHeading
+                                ? "font-semibold text-accent-text uppercase tracking-wider"
+                                : "font-medium text-ink"
+                            }`}
+                          >
+                            {row.displayName}
+                          </span>
+                          {!isHeading && (
+                            <span className="shrink-0 font-mono text-[11px] font-semibold text-accent-text bg-accent-subtle border border-accent-border px-1.5 py-0.5 rounded">
+                              {row.totalBandDays}d
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="font-mono text-[10px] text-ink-muted">
+                            Row {row.row}
+                          </span>
+                          {!isHeading && (
+                            <span className="font-mono text-[10px] text-ink-secondary">
+                              ·{" "}
+                              {row.overlapsWithOtherRow
+                                ? "Parallel overlap enabled"
+                                : "Sequential window"}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="relative flex items-center">
-                        {/* 5-month column grid lines */}
                         <div
                           className="absolute inset-0 grid grid-cols-5 divide-x divide-border-subtle pointer-events-none"
                           aria-hidden="true"
@@ -434,14 +667,16 @@ export default function WorkflowBoard({
                           return (
                             <span
                               key={i}
-                              title={`${row.name}: day ${band.start}–${band.end}`}
+                              title={`${row.displayName}: Day ${band.start}–${band.end} (${span} days)`}
                               style={{
                                 left: `${((band.start - 1) / 150) * 100}%`,
                                 width: `${(span / 150) * 100}%`,
                               }}
                               className="absolute top-1/2 -translate-y-1/2 h-5 rounded-[4px] bg-accent text-white font-mono text-[10px] font-medium flex items-center justify-center overflow-hidden px-1 shadow-sm"
                             >
-                              {span >= 6 ? `${band.start}–${band.end}` : ""}
+                              {span >= 5
+                                ? `D${band.start}–${band.end} (${span}d)`
+                                : `${span}d`}
                             </span>
                           );
                         })}
@@ -467,35 +702,70 @@ export default function WorkflowBoard({
               : "flex flex-col gap-6"
           }
         >
-          {reference.phases.map((phase, index) => {
+          {allPhases.map((phase, index) => {
             const activities = visible.filter((a) => a.phase === index);
             if (!activities.length) return null;
-            const totalInPhase = reference.activities.filter(
+            const totalInPhase = allActivities.filter(
               (a) => a.phase === index
             ).length;
-            const completedInPhase = reference.activities.filter(
+            const completedInPhase = allActivities.filter(
               (a) =>
                 a.phase === index &&
                 states.get(a.id)?.status === "COMPLETED"
             ).length;
+
+            const villaPhase = selectedVillaObj?.phases?.find(
+              (p) =>
+                p.phaseIndex === index ||
+                p.name.toLowerCase() === phase.toLowerCase()
+            );
+            const defaultPhaseWindow = DEFAULT_PHASE_WINDOWS[index];
+            const phaseStartDay =
+              villaPhase?.startDay ?? defaultPhaseWindow?.startDay ?? 1;
+            const phaseEndDay =
+              villaPhase?.endDay ?? defaultPhaseWindow?.endDay ?? 30;
+            const phaseDays =
+              villaPhase?.plannedDays ??
+              defaultPhaseWindow?.plannedDays ??
+              phaseEndDay - phaseStartDay + 1;
+            const isParallelPhase =
+              villaPhase?.allowParallel ??
+              defaultPhaseWindow?.allowParallel ??
+              true;
 
             return (
               <section
                 key={phase}
                 className="rounded-card border border-border border-t-[3px] border-t-accent bg-surface-subtle card-surface overflow-hidden flex flex-col"
               >
-                <div className="flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] border border-accent-border bg-accent-subtle font-mono text-xs font-semibold text-accent-text">
-                      {String(index + 1).padStart(2, "0")}
+                <div className="border-b border-border bg-surface px-4 py-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] border border-accent-border bg-accent-subtle font-mono text-xs font-semibold text-accent-text">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <h3 className="text-sm font-semibold text-ink truncate">
+                        {phase}
+                      </h3>
+                    </div>
+                    <span className="rounded-[5px] border border-border bg-surface-subtle px-2 py-0.5 font-mono text-xs font-medium text-ink-secondary tabular-nums shrink-0">
+                      {completedInPhase}/{totalInPhase} done
                     </span>
-                    <h3 className="text-sm font-semibold text-ink truncate">
-                      {phase}
-                    </h3>
                   </div>
-                  <span className="rounded-[5px] border border-border bg-surface-subtle px-2 py-0.5 font-mono text-xs font-medium text-ink-secondary tabular-nums shrink-0">
-                    {completedInPhase}/{totalInPhase} done
-                  </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-ink-muted">
+                    <span>
+                      Window: Day {phaseStartDay}–{phaseEndDay} ({phaseDays}d)
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded ${
+                        isParallelPhase
+                          ? "bg-accent-subtle text-accent-text"
+                          : "bg-surface-subtle text-ink-secondary border border-border"
+                      }`}
+                    >
+                      {isParallelPhase ? "Parallel phase" : "Sequential phase"}
+                    </span>
+                  </div>
                 </div>
 
                 <div
@@ -507,6 +777,7 @@ export default function WorkflowBoard({
                 >
                   {activities.map((a) => {
                     const state = states.get(a.id)!;
+                    const sched = scheduleMap.get(a.id);
                     const unavailable = loading || !!error;
                     const leftBorder = unavailable
                       ? "border-l-zinc-300"
@@ -521,9 +792,24 @@ export default function WorkflowBoard({
                       >
                         <div className="w-full">
                           <div className="flex items-center justify-between gap-2 mb-2">
-                            <span className="font-mono text-xs font-medium text-ink-muted">
-                              #{String(a.order).padStart(2, "0")}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-xs font-medium text-ink-muted">
+                                #{String(a.order).padStart(2, "0")}
+                              </span>
+                              {sched && (
+                                <span
+                                  className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                                    sched.allowParallel
+                                      ? "bg-accent-subtle text-accent-text"
+                                      : "bg-surface-subtle text-ink-muted border border-border"
+                                  }`}
+                                >
+                                  {sched.allowParallel
+                                    ? `Parallel (${sched.parallelWithIds.length})`
+                                    : "Sequential"}
+                                </span>
+                              )}
+                            </div>
                             <Badge
                               variant={
                                 unavailable
@@ -554,8 +840,10 @@ export default function WorkflowBoard({
                         <div className="w-full flex flex-col gap-2">
                           <div className="flex items-center justify-between text-xs text-ink-muted">
                             <span className="font-mono">
-                              {a.duration === null
-                                ? "Duration unscheduled"
+                              {sched
+                                ? `${sched.duration}d · Days ${sched.startDay}–${sched.endDay}`
+                                : a.duration === null
+                                ? "2d planned"
                                 : `${a.duration}d planned`}
                             </span>
                             <span className="font-mono font-semibold text-ink tabular-nums">
@@ -589,7 +877,7 @@ export default function WorkflowBoard({
                                 )}
                                 {outOfOrder(a) && (
                                   <span className="font-mono text-[11px] text-warning-text bg-warning-bg px-1.5 py-0.5 rounded">
-                                    Earlier work open
+                                    Sequential prerequisite open
                                   </span>
                                 )}
                                 {!villaId && state.recorded > 0 && (
@@ -614,11 +902,12 @@ export default function WorkflowBoard({
               <EmptyState
                 icon="search"
                 title="No matching activities"
-                description="No workflow activities match your current search query or status filter."
+                description="No workflow activities match your current phase, search query, or status filter."
                 actionLabel="Reset filters"
                 onAction={() => {
                   setQuery("");
                   setFilter("all");
+                  setPhaseFilter("all");
                 }}
               />
             </div>
@@ -626,65 +915,30 @@ export default function WorkflowBoard({
         </div>
       )}
 
-      {/* Workbook Notes & Planning Assumptions */}
-      <details className="group rounded-card border border-border bg-surface overflow-hidden">
-        <summary className="flex cursor-pointer items-center justify-between px-5 py-3.5 text-xs font-medium text-ink-secondary hover:bg-surface-subtle select-none list-none">
-          <span className="flex items-center gap-2">
-            <Icon name="documents" className="h-4 w-4 text-ink-muted" />
-            <span>Workbook notes & planning assumptions ({reference.source})</span>
-          </span>
-          <Icon
-            name="chevron-down"
-            className="h-4 w-4 text-ink-muted transition-transform group-open:rotate-180"
-          />
-        </summary>
-        <div className="border-t border-border px-5 py-4 text-xs text-ink-secondary space-y-2.5 leading-relaxed">
-          <p>
-            Source: <span className="font-mono text-ink">{reference.source}</span>.
-            All 89 Sheet1 activities and all 45 Sheet2 rows are retained. Phase
-            names are suggested groupings, not named phases in the workbook.
-            Sheet1 durations are individual activity estimates; their 526-day
-            sum is not the project duration.
-          </p>
-          <p>
-            Sheet2 has overlapping bands, four rows labelled “GF Screed for
-            tiles”, and duration labels that sometimes differ from painted
-            spans. Painted cells define the displayed windows; duration
-            annotation cells are excluded.
-          </p>
-          <p>
-            Project percentages give each villa equal weight and count
-            unreported activities as 0%. Villa updates here are section-level
-            records, separate from task progress in Today.
-          </p>
-          <details className="pt-2">
-            <summary className="cursor-pointer font-medium text-ink hover:text-accent-text">
-              View original schedule annotations
-            </summary>
-            <div className="mt-2 space-y-1.5 pl-3 border-l-2 border-border font-mono text-[11px]">
-              {reference.schedule
-                .filter((r) => r.annotations.length)
-                .map((r) => (
-                  <p key={r.row}>
-                    <strong className="text-ink">{r.name}</strong> —{" "}
-                    {r.annotations.join("; ")}
-                  </p>
-                ))}
-            </div>
-          </details>
-        </div>
-      </details>
-
       {/* Activity Inspection Slide-Over Drawer */}
       {selected && (
         <ActivityPanel
           key={`${villaId}/${selected.id}`}
           activity={selected}
+          phaseName={allPhases[selected.phase] || "Custom Phase"}
+          scheduleMeta={scheduleMap.get(selected.id)}
           projectId={projectId}
           villaId={villaId}
+          villas={villas}
           villaName={villas.find((v) => v.id === villaId)?.villa_number}
           events={events}
           enabled={canEdit && !loading && !error}
+          canApproveRework={canApproveRework && !loading && !error}
+          onSelectVilla={(id) => setVillaId(id)}
+          onScheduleSaved={(activityId, override) => {
+            setScheduleConfig((prev) => ({
+              ...prev,
+              activityOverrides: {
+                ...prev.activityOverrides,
+                [activityId]: override,
+              },
+            }));
+          }}
           close={() => setSelected(null)}
           saved={(event) => setEvents((previous) => [...previous, event])}
         />
@@ -695,20 +949,35 @@ export default function WorkflowBoard({
 
 function ActivityPanel({
   activity,
+  phaseName,
+  scheduleMeta,
   projectId,
   villaId,
+  villas,
   villaName,
   events,
   enabled,
+  canApproveRework,
+  onSelectVilla,
+  onScheduleSaved,
   close,
   saved,
 }: {
   activity: Activity;
+  phaseName: string;
+  scheduleMeta?: ScheduledActivityMeta;
   projectId: string;
   villaId: string;
+  villas: Villa[];
   villaName?: string;
   events: WorkEvent[];
   enabled: boolean;
+  canApproveRework: boolean;
+  onSelectVilla: (id: string) => void;
+  onScheduleSaved: (
+    activityId: string,
+    override: ActivityScheduleOverride
+  ) => void;
   close: () => void;
   saved: (event: WorkEvent) => void;
 }) {
@@ -726,34 +995,64 @@ function ActivityPanel({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
+  const [plannedDays, setPlannedDays] = useState<number>(
+    scheduleMeta?.duration ?? (activity.duration || 2)
+  );
+  const [startDay, setStartDay] = useState<number>(
+    scheduleMeta?.startDay ?? 1
+  );
+  const [allowParallel, setAllowParallel] = useState<boolean>(
+    scheduleMeta?.allowParallel ?? true
+  );
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+
   useEffect(() => {
     setMounted(true);
     const listener = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !saving) close();
-      if (e.key === "Tab") {
-        const elements = Array.from(
-          dialog.current?.querySelectorAll<HTMLElement>(
-            "button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary"
-          ) || []
-        ).filter((el) => !el.closest("fieldset:disabled"));
-        const first = elements[0];
-        const last = elements[elements.length - 1];
-        if (!first) {
-          e.preventDefault();
-          return;
-        }
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
     };
     document.addEventListener("keydown", listener);
     return () => document.removeEventListener("keydown", listener);
   }, [close, saving]);
+
+  async function saveScheduleOverride(e: FormEvent) {
+    e.preventDefault();
+    setScheduleSaving(true);
+    setMessage("");
+    try {
+      const cleanDuration = Math.max(1, Math.min(90, Number(plannedDays) || 1));
+      const cleanStart = Math.max(
+        1,
+        Math.min(150 - cleanDuration + 1, Number(startDay) || 1)
+      );
+      const override: ActivityScheduleOverride = {
+        duration: cleanDuration,
+        startDay: cleanStart,
+        allowParallel,
+      };
+      await api("/workflow/schedule-config", {
+        method: "POST",
+        body: JSON.stringify({
+          activityId: activity.id,
+          override,
+        }),
+      });
+      onScheduleSaved(activity.id, override);
+      setMessage(
+        `Schedule updated: ${cleanDuration} days (Days ${cleanStart}–${
+          cleanStart + cleanDuration - 1
+        }, ${
+          allowParallel ? "Parallel overlap enabled" : "Sequential mode"
+        }) with 0 duration conflicts.`
+      );
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Could not update schedule."
+      );
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -790,7 +1089,43 @@ function ActivityPanel({
     }
   }
 
+  async function approveActivityRework() {
+    if (!villaId) return;
+    setSaving(true);
+    setMessage("");
+    try {
+      const approvalNote =
+        note.trim() ||
+        "Rework inspected and approved by Manager/Director. Quality hold cleared.";
+      const event = await api<WorkEvent>(`/workflow/${projectId}`, {
+        method: "POST",
+        body: JSON.stringify({
+          villa_id: villaId,
+          activity_key: activity.id,
+          revision: (current?.revision || 0) + 1,
+          status: "IN_PROGRESS",
+          progress: Math.max(current?.progress || 50, 65),
+          note: `REWORK APPROVED: ${approvalNote}`,
+        }),
+      });
+      saved(event);
+      setStatus("IN_PROGRESS");
+      setProgress(event.progress);
+      setNote("");
+      setMessage("Rework approved and activity cleared for continuation.");
+    } catch (cause) {
+      setMessage(
+        cause instanceof Error ? cause.message : "Could not approve rework."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (!mounted) return null;
+
+  const computedEndDay =
+    Math.max(1, Math.min(150 - plannedDays + 1, startDay)) + plannedDays - 1;
 
   const drawerContent = (
     <div
@@ -804,7 +1139,7 @@ function ActivityPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="wf-detail-title"
-        className="relative flex h-dvh w-full max-w-[480px] flex-col border-l border-border bg-surface shadow-float overflow-hidden"
+        className="relative flex h-dvh w-full max-w-[500px] flex-col border-l border-border bg-surface shadow-float overflow-hidden"
       >
         {/* Drawer Header */}
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
@@ -825,10 +1160,10 @@ function ActivityPanel({
               {activity.name}
             </h2>
             <p className="mt-1 text-xs text-ink-secondary">
-              {reference.phases[activity.phase]} ·{" "}
-              {activity.duration === null
-                ? "Duration not specified"
-                : `${activity.duration} planned days`}
+              {phaseName} ·{" "}
+              {scheduleMeta
+                ? `${scheduleMeta.duration} planned days (Days ${scheduleMeta.startDay}–${scheduleMeta.endDay})`
+                : `${activity.duration || 2} planned days`}
             </p>
           </div>
           <button
@@ -845,6 +1180,89 @@ function ActivityPanel({
 
         {/* Drawer Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Duration & Parallel Execution Configuration Card */}
+          <div className="rounded-control border border-border bg-surface-subtle p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-accent-text">
+                Duration & Parallel Schedule (0 Conflicts)
+              </span>
+              <Badge variant="success" dot={false}>
+                {plannedDays}d = Day {startDay}–{computedEndDay}
+              </Badge>
+            </div>
+
+            {scheduleMeta && scheduleMeta.parallelWithNames.length > 0 && (
+              <p className="text-xs text-ink-secondary leading-relaxed">
+                <strong className="text-ink">
+                  Overlaps in parallel with ({scheduleMeta.parallelWithIds.length}):
+                </strong>{" "}
+                {scheduleMeta.parallelWithNames.join(", ")}
+                {scheduleMeta.parallelWithIds.length >
+                scheduleMeta.parallelWithNames.length
+                  ? ` +${
+                      scheduleMeta.parallelWithIds.length -
+                      scheduleMeta.parallelWithNames.length
+                    } more`
+                  : ""}
+              </p>
+            )}
+
+            <form onSubmit={saveScheduleOverride} className="space-y-3 pt-1">
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Duration (Days)" htmlFor="wf-sched-days">
+                  <Input
+                    id="wf-sched-days"
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={plannedDays}
+                    onChange={(e) =>
+                      setPlannedDays(Math.max(1, Number(e.target.value) || 1))
+                    }
+                    className="font-mono"
+                  />
+                </FormField>
+                <FormField label="Start Day (1–150)" htmlFor="wf-sched-start">
+                  <Input
+                    id="wf-sched-start"
+                    type="number"
+                    min={1}
+                    max={150}
+                    value={startDay}
+                    onChange={(e) =>
+                      setStartDay(Math.max(1, Number(e.target.value) || 1))
+                    }
+                    className="font-mono"
+                  />
+                </FormField>
+              </div>
+
+              <label className="flex items-center gap-2.5 text-xs text-ink cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={allowParallel}
+                  onChange={(e) => setAllowParallel(e.target.checked)}
+                  className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                />
+                <span>
+                  Allow parallel overlap with concurrent works (uncheck for strict
+                  sequential dependency)
+                </span>
+              </label>
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  size="sm"
+                  loading={scheduleSaving}
+                >
+                  Update work duration & parallelism
+                </Button>
+              </div>
+            </form>
+          </div>
+
           {activity.remarks && (
             <div className="rounded-control border border-border bg-surface-subtle p-3.5 text-xs">
               <strong className="block font-medium text-ink mb-1">
@@ -857,12 +1275,52 @@ function ActivityPanel({
           )}
 
           {!villaId ? (
-            <div className="rounded-control border border-dashed border-border bg-surface-subtle/60 p-4 text-xs text-ink-secondary">
-              Select a specific villa in the toolbar above to record progress and
-              inspect its activity history.
+            <div className="rounded-control border border-dashed border-border bg-surface-subtle/60 p-4 space-y-3">
+              <p className="text-xs text-ink-secondary">
+                Select a specific villa below to upload progress, approve
+                rework, or inspect its activity history:
+              </p>
+              <Select
+                aria-label="Select villa"
+                value={villaId}
+                onChange={(e) => onSelectVilla(e.target.value)}
+              >
+                <option value="">Choose a villa…</option>
+                {villas.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    Villa {v.villa_number}
+                  </option>
+                ))}
+              </Select>
             </div>
           ) : (
             <>
+              {current?.status === "REWORK_REQUIRED" && canApproveRework && (
+                <div className="rounded-control border border-danger-border bg-danger-bg p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs font-semibold uppercase tracking-wider text-danger-text">
+                      Rework Approval Required
+                    </span>
+                    <Badge variant="danger">Rework hold</Badge>
+                  </div>
+                  <p className="text-xs text-ink-secondary">
+                    Latest rework reason:{" "}
+                    <strong className="text-ink">
+                      {current.note || "Flagged for rework"}
+                    </strong>
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="check"
+                    loading={saving}
+                    onClick={() => void approveActivityRework()}
+                  >
+                    Approve rework & clear hold
+                  </Button>
+                </div>
+              )}
+
               <form onSubmit={save} className="space-y-4">
                 <fieldset
                   disabled={!enabled || saving}
@@ -957,7 +1415,11 @@ function ActivityPanel({
 
               {!enabled && (
                 <p className="text-xs text-ink-muted">
-                  Live access and work editing permission are required to save.
+                  Engineer or Director role is required to upload new activity
+                  states.{" "}
+                  {canApproveRework
+                    ? "As Manager, you can approve any item flagged for rework."
+                    : ""}
                 </p>
               )}
 

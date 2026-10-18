@@ -2,8 +2,21 @@
 
 import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import {
+  api,
+  buildDefaultVillaPhases,
+  LocalVilla,
+  reconcileVillaPhases,
+  VillaPhaseConfig,
+} from "@/lib/api";
 import "@/lib/firebase";
+import {
+  AppRole,
+  canRoleApproveRework,
+  canRoleDoAnything,
+  canRoleUploadVillaState,
+  getStoredRole,
+} from "@/lib/roles";
 import BrandLogo from "@/components/brand-logo";
 import WorkflowBoard from "@/components/workflow-board";
 import { OperationsModule } from "@/components/operations-modules";
@@ -26,6 +39,7 @@ import {
   Select,
   Skeleton,
   TableSkeleton,
+  Textarea,
   ThemeToggle,
 } from "@/components/ui";
 
@@ -36,13 +50,7 @@ type Project = {
   status: string;
 };
 
-type Villa = {
-  id: string;
-  villa_number: string;
-  block?: string;
-  status: string;
-  villa_type?: string;
-};
+type Villa = LocalVilla;
 
 type Task = {
   id: string;
@@ -59,6 +67,7 @@ type Me = {
   email: string | null;
   full_name?: string | null;
   employee_code?: string | null;
+  role_name?: string | null;
 };
 
 type CatalogItem = {
@@ -84,9 +93,6 @@ type PersonData = {
   }[];
   projects: Project[];
 };
-
-const isAdmin = (email?: string | null) =>
-  !email || email.toLowerCase() === "anajrajeev@gmail.com";
 
 const navItems = [
   "Dashboard",
@@ -137,6 +143,7 @@ const navIconMap: Record<NavItem, IconName> = {
 
 export default function Workspace() {
   const router = useRouter();
+  const [role, setRole] = useState<AppRole | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [villas, setVillas] = useState<Villa[]>([]);
@@ -145,6 +152,18 @@ export default function Workspace() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [addingVilla, setAddingVilla] = useState(false);
+  const [uploadingStateVilla, setUploadingStateVilla] = useState<Villa | null>(
+    null
+  );
+  const [approvingReworkVilla, setApprovingReworkVilla] =
+    useState<Villa | null>(null);
+  const [editingPhasesVilla, setEditingPhasesVilla] = useState<Villa | null>(
+    null
+  );
+  const [linkedWorkSectionFilter, setLinkedWorkSectionFilter] = useState<{
+    villaId: string;
+    phaseIndex: number | null;
+  }>({ villaId: "", phaseIndex: null });
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -182,8 +201,17 @@ export default function Workspace() {
   };
 
   useEffect(() => {
+    const storedRole = getStoredRole();
+    if (!storedRole) {
+      router.replace("/");
+      return;
+    }
+    setRole(storedRole);
+    if (storedRole === "Engineer") {
+      setActive("Villas");
+    }
     void load();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -196,11 +224,12 @@ export default function Workspace() {
     }
     if (profileOpen) {
       document.addEventListener("mousedown", handleOutsideClick);
-      return () => document.removeEventListener("mousedown", handleOutsideClick);
+      return () =>
+        document.removeEventListener("mousedown", handleOutsideClick);
     }
   }, [profileOpen]);
 
-  if (loading) return <WorkspaceLoader />;
+  if (!role || loading) return <WorkspaceLoader />;
 
   if (loadError) {
     return (
@@ -227,20 +256,36 @@ export default function Workspace() {
   }
 
   const project = projects[0];
-  const canAdd = isAdmin(me?.email);
-  const profileName = me?.full_name || me?.email || "Account";
-  const initials = profileName
-    .split(/\s+|@/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+  const backendPermissions = me?.permissions || [];
+  const isDirector =
+    backendPermissions.length > 0
+      ? backendPermissions.includes("people.manage") &&
+        backendPermissions.includes("project.write")
+      : canRoleDoAnything(role);
+  const canApproveRework =
+    backendPermissions.length > 0
+      ? backendPermissions.includes("rework.approve")
+      : canRoleApproveRework(role);
+  const canUploadState =
+    backendPermissions.length > 0
+      ? backendPermissions.includes("villa.state.upload")
+      : canRoleUploadVillaState(role);
+  const canAdd = isDirector;
+  const profileName = me?.full_name || role;
+  const initials = role.slice(0, 2).toUpperCase();
 
   const selectSection = (section: ActiveSection) => {
     setActive(section);
     setMobileMenuOpen(false);
     setProfileOpen(false);
+  };
+
+  const openVillaPhaseInWorkSections = (
+    villaId: string,
+    phaseIndex: number | null = null
+  ) => {
+    setLinkedWorkSectionFilter({ villaId, phaseIndex });
+    selectSection("Work sections");
   };
 
   const renderNavButton = (item: NavItem) => {
@@ -272,7 +317,7 @@ export default function Workspace() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col lg:flex-row">
-      {/* Desktop Sidebar — Grounded Deep Architectural Teal-Slate */}
+      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:w-60 lg:shrink-0 lg:flex-col lg:border-r lg:border-[#183835] lg:bg-[#0c2422] lg:text-teal-50 lg:sticky lg:top-0 lg:h-screen">
         <div className="h-14 px-4 border-b border-[#183835] flex items-center justify-between">
           <BrandLogo priority inverted />
@@ -285,14 +330,17 @@ export default function Workspace() {
                 Current project
               </span>
               {project?.status && (
-                <Badge status={project.status} className="text-[10px] px-1.5 py-0" />
+                <Badge
+                  status={project.status}
+                  className="text-[10px] px-1.5 py-0"
+                />
               )}
             </div>
             <p className="mt-1 text-xs font-semibold text-white truncate">
               {project?.name || "No project"}
             </p>
             <p className="font-mono text-[11px] text-teal-300/85 truncate">
-              {project?.project_code || "Create a project"}
+              {project?.project_code || "Operations"}
             </p>
           </div>
         </div>
@@ -315,9 +363,7 @@ export default function Workspace() {
 
         <div className="p-3 border-t border-[#183835] bg-[#091c1a]">
           <div className="flex items-center justify-between text-xs text-teal-200/75 px-1">
-            <span className="truncate font-medium">
-              {me?.employee_code || "Workspace"}
-            </span>
+            <span className="truncate font-medium">{role}</span>
             <span className="font-mono text-[11px] text-teal-300">
               {villas.length} villas · {tasks.length} tasks
             </span>
@@ -358,7 +404,7 @@ export default function Workspace() {
                   {project?.name || "No project"}
                 </p>
                 <p className="font-mono text-[11px] text-teal-300/85">
-                  {project?.project_code || "Create a project"}
+                  {project?.project_code || "Operations"}
                 </p>
               </div>
             </div>
@@ -400,7 +446,7 @@ export default function Workspace() {
               className="flex items-center gap-2 text-xs sm:text-sm min-w-0"
             >
               <span className="font-mono text-xs text-ink-muted hidden sm:inline truncate">
-                {project?.project_code || "Operations"}
+                Operations
               </span>
               <span
                 className="text-ink-muted hidden sm:inline"
@@ -413,6 +459,18 @@ export default function Workspace() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Badge variant="accent" dot mono>
+              {role}
+            </Badge>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => router.push("/")}
+            >
+              Switch role
+            </Button>
+
             <ThemeToggle />
 
             <button
@@ -442,7 +500,7 @@ export default function Workspace() {
                 </span>
                 <span className="hidden md:flex flex-col leading-none">
                   <span className="text-xs font-medium text-ink max-w-[120px] truncate">
-                    {profileName}
+                    {role}
                   </span>
                 </span>
                 <Icon
@@ -467,7 +525,7 @@ export default function Workspace() {
                         {profileName}
                       </p>
                       <p className="text-[11px] text-ink-muted truncate">
-                        {me?.email}
+                        Role: {role}
                       </p>
                     </div>
                   </div>
@@ -481,7 +539,28 @@ export default function Workspace() {
                       <Icon name="user" className="h-3.5 w-3.5 text-ink-muted" />
                       <span>View profile</span>
                     </span>
-                    <Icon name="arrow-right" className="h-3.5 w-3.5 text-ink-muted" />
+                    <Icon
+                      name="arrow-right"
+                      className="h-3.5 w-3.5 text-ink-muted"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => router.push("/")}
+                    className="w-full flex items-center justify-between rounded-control px-2.5 py-2 text-xs font-medium text-ink-secondary hover:bg-surface-muted hover:text-ink transition-colors duration-fast focus-ring"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon
+                        name="log-out"
+                        className="h-3.5 w-3.5 text-ink-muted"
+                      />
+                      <span>Change role (Starter page)</span>
+                    </span>
+                    <Icon
+                      name="arrow-right"
+                      className="h-3.5 w-3.5 text-ink-muted"
+                    />
                   </button>
                 </div>
               )}
@@ -500,24 +579,32 @@ export default function Workspace() {
               onWorkSections={() => selectSection("Work sections")}
               onAdd={() => setAddingVilla(true)}
               canAdd={canAdd}
+              canApproveRework={canApproveRework}
+              onApproveRework={(villa) => setApprovingReworkVilla(villa)}
             />
           ) : active === "Villas" ? (
             <Villas
               villas={villas}
               tasks={tasks}
-              projectCode={project?.project_code}
               onAdd={() => setAddingVilla(true)}
               canAdd={canAdd}
+              canUploadState={canUploadState}
+              canApproveRework={canApproveRework}
+              onUploadState={(villa) =>
+                setUploadingStateVilla(villa || villas[0] || null)
+              }
+              onApproveRework={(villa) => setApprovingReworkVilla(villa)}
+              onEditPhases={(villa) => setEditingPhasesVilla(villa)}
+              onOpenWorkSection={openVillaPhaseInWorkSections}
             />
           ) : active === "Work sections" ? (
             <div className="space-y-8">
               <WorkflowBoard
                 projects={projects}
-                canEdit={
-                  me?.permissions?.length
-                    ? Boolean(me.permissions.includes("task.write"))
-                    : true
-                }
+                canEdit={canUploadState}
+                canApproveRework={canApproveRework}
+                initialVillaId={linkedWorkSectionFilter.villaId}
+                initialPhaseFilter={linkedWorkSectionFilter.phaseIndex}
               />
               <Card noPadding>
                 <details className="group">
@@ -577,7 +664,13 @@ export default function Workspace() {
           className="lg:hidden fixed bottom-0 inset-x-0 z-20 h-14 border-t border-border bg-surface/95 backdrop-blur-sm px-2 flex items-center justify-around"
         >
           {(
-            ["Dashboard", "Today", "Villas", "Work sections", "Quality"] as NavItem[]
+            [
+              "Dashboard",
+              "Today",
+              "Villas",
+              "Work sections",
+              "Quality",
+            ] as NavItem[]
           ).map((item) => {
             const isSelected = active === item;
             return (
@@ -607,6 +700,7 @@ export default function Workspace() {
         </nav>
       </div>
 
+      {/* Add Villa Modal (Director) */}
       {addingVilla && project && (
         <AddVilla
           project={project}
@@ -614,6 +708,47 @@ export default function Workspace() {
           done={async () => {
             setAddingVilla(false);
             await load();
+          }}
+        />
+      )}
+
+      {/* Upload Villa State Modal (Engineer & Director in Operations / Villas) */}
+      {uploadingStateVilla && (
+        <UploadVillaStateModal
+          villas={villas}
+          initialVilla={uploadingStateVilla}
+          close={() => setUploadingStateVilla(null)}
+          done={async () => {
+            setUploadingStateVilla(null);
+            await load();
+          }}
+        />
+      )}
+
+      {/* Approve Rework Modal (Manager & Director) */}
+      {approvingReworkVilla && (
+        <ApproveReworkModal
+          villa={approvingReworkVilla}
+          close={() => setApprovingReworkVilla(null)}
+          done={async () => {
+            setApprovingReworkVilla(null);
+            await load();
+          }}
+        />
+      )}
+
+      {/* Edit Villa & Phases Modal (Linked to Work Sections Page) */}
+      {editingPhasesVilla && (
+        <EditVillaPhasesModal
+          villa={editingPhasesVilla}
+          close={() => setEditingPhasesVilla(null)}
+          done={async (openInWorkSections) => {
+            const targetVillaId = editingPhasesVilla.id;
+            setEditingPhasesVilla(null);
+            await load();
+            if (openInWorkSections) {
+              openVillaPhaseInWorkSections(targetVillaId, null);
+            }
           }}
         />
       )}
@@ -687,6 +822,8 @@ function Dashboard({
   onWorkSections,
   onAdd,
   canAdd,
+  canApproveRework,
+  onApproveRework,
 }: {
   project?: Project;
   villas: Villa[];
@@ -695,39 +832,17 @@ function Dashboard({
   onWorkSections: () => void;
   onAdd: () => void;
   canAdd: boolean;
+  canApproveRework: boolean;
+  onApproveRework: (villa: Villa) => void;
 }) {
-  const firstVilla = villas[0];
-  const guidance = !project
-    ? {
-        title: "Create your first project",
-        detail:
-          "Projects organise every villa, team, and work record in BuildLens.",
-      }
-    : !firstVilla
-    ? {
-        title: "Map the first villa",
-        detail:
-          "Start the operational record by adding the first villa for this project.",
-      }
-    : tasks.length === 0
-    ? {
-        title: "Set up the first work item",
-        detail: `Villa ${firstVilla.villa_number} is mapped. Add work sections and tasks when the site team is ready.`,
-      }
-    : {
-        title: "Keep work moving",
-        detail: `${tasks.length} live work ${
-          tasks.length === 1 ? "item is" : "items are"
-        } available for this workspace.`,
-      };
-
+  const reworkVillas = villas.filter((v) => v.status === "REWORK_REQUIRED");
   const completedTasks = tasks.filter(
     (t) => String(t.status).toUpperCase() === "COMPLETED"
   ).length;
-  const avgProgress = tasks.length
+  const avgProgress = villas.length
     ? Math.round(
-        tasks.reduce((acc, item) => acc + (Number(item.progress) || 0), 0) /
-          tasks.length
+        villas.reduce((acc, item) => acc + (Number(item.progress) || 0), 0) /
+          villas.length
       )
     : 0;
 
@@ -736,7 +851,7 @@ function Dashboard({
       <PageHeader
         eyebrow="Construction control room"
         title={project?.name || "Start your first project"}
-        description="Track every villa, work package, responsibility, and exception from one operational record."
+        description="Track every villa, work package, responsibility, and rework approval from one operational record."
         secondaryAction={
           <Button
             variant="secondary"
@@ -771,15 +886,77 @@ function Dashboard({
         <MetricCard
           label="Average progress"
           value={`${avgProgress}%`}
-          subvalue="Across active tasks"
+          subvalue="Across mapped villas"
           icon="reports"
         />
         <MetricCard
-          label="Project status"
-          value={formatLabel(project?.status || "Not configured")}
-          badge={<Badge status={project?.status || "PLANNING"} />}
+          label="Rework required"
+          value={reworkVillas.length}
+          subvalue={
+            reworkVillas.length
+              ? "Awaiting rework approval"
+              : "All units clear"
+          }
+          badge={
+            <Badge variant={reworkVillas.length ? "danger" : "success"}>
+              {reworkVillas.length ? "Action needed" : "Clear"}
+            </Badge>
+          }
         />
       </div>
+
+      {/* Rework Queue Card on Dashboard when rework items exist */}
+      {reworkVillas.length > 0 && (
+        <Card className="border-danger-border bg-danger-bg/40 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Icon
+                name="alert-triangle"
+                className="h-4 w-4 text-danger-text"
+              />
+              <h2 className="text-sm font-semibold text-ink">
+                Villas awaiting rework approval ({reworkVillas.length})
+              </h2>
+            </div>
+            <Button variant="secondary" size="sm" onClick={onVillas}>
+              Open Operations / Villas
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {reworkVillas.map((rv) => (
+              <div
+                key={rv.id}
+                className="rounded-control border border-border bg-surface p-3.5 flex items-start justify-between gap-3"
+              >
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-ink">
+                      Villa {rv.villa_number}
+                    </span>
+                    <Badge status="REWORK_REQUIRED" />
+                  </div>
+                  <p className="font-mono text-xs text-accent-text">
+                    {rv.work_section}
+                  </p>
+                  <p className="text-xs text-ink-secondary line-clamp-2">
+                    {rv.state_note}
+                  </p>
+                </div>
+                {canApproveRework && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="check"
+                    onClick={() => onApproveRework(rv)}
+                  >
+                    Approve rework
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <Card noPadding className="lg:col-span-2">
@@ -815,57 +992,42 @@ function Dashboard({
                   <tr className="border-b border-border bg-surface-subtle text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
                     <th className="py-2.5 px-4">Unit</th>
                     <th className="py-2.5 px-4">Block</th>
-                    <th className="py-2.5 px-4">Typology</th>
-                    <th className="py-2.5 px-4">Tasks</th>
+                    <th className="py-2.5 px-4">Active Phase / Section</th>
                     <th className="py-2.5 px-4 w-40">Progress</th>
                     <th className="py-2.5 px-4 text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle text-sm">
-                  {villas.map((villa) => {
-                    const villaTasks = tasks.filter(
-                      (t) => t.villa_id === villa.id
-                    );
-                    const villaProgress = villaTasks.length
-                      ? Math.round(
-                          villaTasks.reduce(
-                            (sum, t) => sum + (Number(t.progress) || 0),
-                            0
-                          ) / villaTasks.length
-                        )
-                      : 0;
-                    return (
-                      <tr
-                        key={villa.id}
-                        onClick={onVillas}
-                        className="cursor-pointer transition-colors duration-fast hover:bg-surface-subtle"
-                      >
-                        <td className="py-3 px-4 font-medium text-ink">
-                          <span className="inline-flex items-center gap-2">
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-[5px] border border-accent-border bg-accent-subtle font-mono text-[11px] font-semibold text-accent-text">
-                              {villa.villa_number.replace(/\D+/g, "").slice(-2) || "V"}
-                            </span>
-                            <span>Villa {villa.villa_number}</span>
+                  {villas.map((villa) => (
+                    <tr
+                      key={villa.id}
+                      onClick={onVillas}
+                      className="cursor-pointer transition-colors duration-fast hover:bg-surface-subtle"
+                    >
+                      <td className="py-3 px-4 font-medium text-ink">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-[5px] border border-accent-border bg-accent-subtle font-mono text-[11px] font-semibold text-accent-text">
+                            {villa.villa_number
+                              .replace(/\D+/g, "")
+                              .slice(-2) || "V"}
                           </span>
-                        </td>
-                        <td className="py-3 px-4 font-mono text-xs text-ink-secondary">
-                          {villa.block || "No block"}
-                        </td>
-                        <td className="py-3 px-4 text-xs text-ink-secondary">
-                          {villa.villa_type || "Type pending"}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-xs text-ink-secondary tabular-nums">
-                          {villaTasks.length}
-                        </td>
-                        <td className="py-3 px-4">
-                          <ProgressBar value={villaProgress} />
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <Badge status={villa.status} />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          <span>Villa {villa.villa_number}</span>
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-xs text-ink-secondary">
+                        {villa.block || "No block"}
+                      </td>
+                      <td className="py-3 px-4 text-xs text-ink-secondary">
+                        {villa.work_section || villa.villa_type || "Active"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <ProgressBar value={villa.progress || 0} />
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <Badge status={villa.status} />
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -873,37 +1035,6 @@ function Dashboard({
         </Card>
 
         <div className="space-y-6">
-          <Card className="space-y-4 border-accent-border bg-accent-subtle">
-            <div>
-              <span className="inline-flex items-center gap-1.5 rounded-[5px] bg-accent px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white">
-                Next operational step
-              </span>
-              <h3 className="mt-2 text-base font-semibold text-ink">
-                {guidance.title}
-              </h3>
-              <p className="mt-1 text-xs text-ink-secondary leading-relaxed">
-                {guidance.detail}
-              </p>
-            </div>
-
-            <div className="rounded-control border border-accent-border bg-surface p-3">
-              <p className="font-mono text-[11px] font-semibold text-accent-text uppercase tracking-wider mb-2">
-                Execution hierarchy
-              </p>
-              <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs text-ink">
-                <span>Project</span>
-                <span className="text-ink-muted">→</span>
-                <span>Villa</span>
-                <span className="text-ink-muted">→</span>
-                <span>Work</span>
-                <span className="text-ink-muted">→</span>
-                <span>Task</span>
-                <span className="text-ink-muted">→</span>
-                <span className="text-accent-text font-semibold">Progress</span>
-              </div>
-            </div>
-          </Card>
-
           <Card noPadding>
             <CardHeader
               eyebrow="Active queue"
@@ -944,21 +1075,31 @@ function Dashboard({
 }
 
 /* ==========================================================================
-   VILLAS VIEW
+   OPERATIONS / VILLAS VIEW
    ========================================================================== */
 
 function Villas({
   villas,
   tasks,
-  projectCode,
   onAdd,
   canAdd,
+  canUploadState,
+  canApproveRework,
+  onUploadState,
+  onApproveRework,
+  onEditPhases,
+  onOpenWorkSection,
 }: {
   villas: Villa[];
   tasks: Task[];
-  projectCode?: string;
   onAdd: () => void;
   canAdd: boolean;
+  canUploadState: boolean;
+  canApproveRework: boolean;
+  onUploadState: (villa?: Villa) => void;
+  onApproveRework: (villa: Villa) => void;
+  onEditPhases: (villa: Villa) => void;
+  onOpenWorkSection: (villaId: string, phaseIndex: number | null) => void;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -973,7 +1114,9 @@ function Villas({
         !q ||
         v.villa_number.toLowerCase().includes(q) ||
         (v.block || "").toLowerCase().includes(q) ||
-        (v.villa_type || "").toLowerCase().includes(q);
+        (v.villa_type || "").toLowerCase().includes(q) ||
+        (v.work_section || "").toLowerCase().includes(q) ||
+        (v.state_note || "").toLowerCase().includes(q);
       return matchesStatus && matchesQuery;
     });
   }, [villas, query, statusFilter]);
@@ -981,25 +1124,98 @@ function Villas({
   const statuses = useMemo(
     () =>
       Array.from(
-        new Set(villas.map((v) => String(v.status).toUpperCase()).filter(Boolean))
+        new Set(
+          villas.map((v) => String(v.status).toUpperCase()).filter(Boolean)
+        )
       ),
+    [villas]
+  );
+
+  const reworkVillas = useMemo(
+    () => villas.filter((v) => v.status === "REWORK_REQUIRED"),
     [villas]
   );
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={projectCode || "Unit register"}
+        eyebrow="Operations / Villas"
         title="All villas"
-        description="Inspect unit typologies, block assignments, and live work package execution status."
+        description="Upload live villa states, edit villa phases linked to Work sections, and approve rework."
+        secondaryAction={
+          canUploadState && villas.length > 0 ? (
+            <Button
+              variant="primary"
+              icon="plus"
+              onClick={() => onUploadState(villas[0])}
+            >
+              Upload villa state
+            </Button>
+          ) : undefined
+        }
         action={
           canAdd ? (
-            <Button icon="plus" onClick={onAdd}>
+            <Button variant="secondary" icon="plus" onClick={onAdd}>
               Add villa
             </Button>
           ) : undefined
         }
       />
+
+      {/* Pending Rework Approval Banner for Manager & Director */}
+      {reworkVillas.length > 0 && (
+        <Card className="border-danger-border bg-danger-bg/40 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Icon
+                name="alert-triangle"
+                className="h-4 w-4 text-danger-text"
+              />
+              <span className="text-sm font-semibold text-ink">
+                Rework approval queue ({reworkVillas.length}{" "}
+                {reworkVillas.length === 1 ? "villa" : "villas"})
+              </span>
+            </div>
+            <Badge variant="danger">
+              {canApproveRework
+                ? "Ready for your rework approval"
+                : "Awaiting Manager / Director approval"}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {reworkVillas.map((rv) => (
+              <div
+                key={rv.id}
+                className="rounded-control border border-border bg-surface p-3.5 flex items-start justify-between gap-3"
+              >
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-ink">
+                      Villa {rv.villa_number}
+                    </span>
+                    <span className="font-mono text-xs text-accent-text">
+                      · {rv.work_section}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-secondary leading-relaxed">
+                    {rv.state_note}
+                  </p>
+                </div>
+                {canApproveRework && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="check"
+                    onClick={() => onApproveRework(rv)}
+                  >
+                    Approve rework
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -1009,7 +1225,7 @@ function Villas({
           />
           <Input
             type="search"
-            placeholder="Filter by villa number, block, or type…"
+            placeholder="Filter by villa number, block, phase, or note…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-9"
@@ -1021,7 +1237,7 @@ function Villas({
             aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-44"
+            className="w-48"
           >
             <option value="ALL">All statuses ({villas.length})</option>
             {statuses.map((st) => (
@@ -1051,12 +1267,14 @@ function Villas({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border bg-surface-subtle text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
-                  <th className="py-3 px-4">Villa Number</th>
-                  <th className="py-3 px-4">Block</th>
-                  <th className="py-3 px-4">Villa Type</th>
-                  <th className="py-3 px-4">Assigned Tasks</th>
-                  <th className="py-3 px-4 w-48">Completion</th>
-                  <th className="py-3 px-4 text-right">Status</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Villa & Block</th>
+                  <th className="py-3 px-4">Linked Phases</th>
+                  <th className="py-3 px-4">Latest State & Field Note</th>
+                  <th className="py-3 px-4 w-36">Completion</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Status</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle text-sm">
@@ -1064,36 +1282,166 @@ function Villas({
                   const unitTasks = tasks.filter(
                     (t) => t.villa_id === villa.id
                   );
-                  const progress = unitTasks.length
-                    ? Math.round(
-                        unitTasks.reduce(
-                          (acc, item) => acc + (Number(item.progress) || 0),
-                          0
-                        ) / unitTasks.length
-                      )
-                    : 0;
+                  const progress =
+                    villa.progress !== undefined
+                      ? villa.progress
+                      : unitTasks.length
+                      ? Math.round(
+                          unitTasks.reduce(
+                            (acc, item) => acc + (Number(item.progress) || 0),
+                            0
+                          ) / unitTasks.length
+                        )
+                      : 0;
+                  const villaPhases =
+                    villa.phases && villa.phases.length > 0
+                      ? villa.phases
+                      : buildDefaultVillaPhases();
+                  const visiblePhases = villaPhases.slice(0, 3);
+                  const hiddenCount = Math.max(
+                    0,
+                    villaPhases.length - visiblePhases.length
+                  );
+
                   return (
                     <tr
                       key={villa.id}
-                      className="transition-colors duration-fast hover:bg-surface-subtle"
+                      className="transition-colors duration-fast hover:bg-surface-subtle/60 align-middle"
                     >
-                      <td className="py-3.5 px-4 font-semibold text-ink">
-                        Villa {villa.villa_number}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-semibold text-ink">
+                          Villa {villa.villa_number}
+                        </div>
+                        <div className="font-mono text-xs text-ink-secondary mt-0.5">
+                          {villa.block || "Block A"}
+                        </div>
+                        <div className="text-xs text-ink-muted">
+                          {villa.villa_type || "Standard Villa"}
+                        </div>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-xs text-ink-secondary">
-                        {villa.block || "Block pending"}
+
+                      {/* Linked Phases column */}
+                      <td className="py-3.5 px-4 max-w-[280px]">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {visiblePhases.map((ph, idx) => (
+                            <button
+                              key={`${ph.name}-${idx}`}
+                              type="button"
+                              title={`Open "${ph.name}" in Work sections (${ph.plannedDays}d, Days ${ph.startDay}–${ph.endDay}, ${
+                                ph.allowParallel ? "Parallel" : "Sequential"
+                              })`}
+                              onClick={() =>
+                                onOpenWorkSection(villa.id, ph.phaseIndex)
+                              }
+                              className="inline-flex items-center gap-1 rounded-[6px] border border-border bg-surface-subtle px-2 py-0.5 text-[11px] font-mono text-ink-secondary hover:border-accent-border hover:bg-accent-subtle hover:text-accent-text transition-colors"
+                            >
+                              <span className="font-semibold text-ink">
+                                {String(idx + 1).padStart(2, "0")}
+                              </span>
+                              <span className="truncate max-w-[115px]">
+                                {ph.name}
+                              </span>
+                              <span className="text-[10px] text-ink-muted">
+                                {ph.plannedDays}d
+                              </span>
+                            </button>
+                          ))}
+                          {hiddenCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => onEditPhases(villa)}
+                              className="inline-flex items-center rounded-[6px] border border-accent-border bg-accent-subtle px-2 py-0.5 text-[11px] font-mono font-medium text-accent-text hover:opacity-90 transition-opacity"
+                            >
+                              +{hiddenCount} more
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onEditPhases(villa)}
+                            className="font-mono text-[11px] font-medium text-accent-text hover:underline"
+                          >
+                            Edit phases ({villaPhases.length})
+                          </button>
+                          <span className="text-ink-muted">·</span>
+                          <button
+                            type="button"
+                            onClick={() => onOpenWorkSection(villa.id, null)}
+                            className="font-mono text-[11px] text-ink-secondary hover:text-ink hover:underline"
+                          >
+                            Work sections →
+                          </button>
+                        </div>
                       </td>
-                      <td className="py-3.5 px-4 text-xs text-ink-secondary">
-                        {villa.villa_type || "Type pending"}
+
+                      {/* Latest Uploaded State & Field Note */}
+                      <td className="py-3.5 px-4 max-w-xs">
+                        <div className="font-mono text-xs font-semibold text-accent-text truncate">
+                          {villa.work_section || "Services & waterproofing"}
+                        </div>
+                        <p className="text-xs text-ink-secondary mt-0.5 line-clamp-2 leading-relaxed">
+                          {villa.state_note || "No field state uploaded yet."}
+                        </p>
+                        {(villa.evidence_file || villa.rework_approved_by) && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-ink-muted">
+                            {villa.evidence_file && (
+                              <span className="rounded bg-surface-subtle border border-border px-1.5 py-0.5 text-ink-secondary">
+                                {villa.evidence_file}
+                              </span>
+                            )}
+                            {villa.rework_approved_by && (
+                              <span className="rounded bg-success-bg border border-success-border px-1.5 py-0.5 text-success-text">
+                                Approved by {villa.rework_approved_by}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-xs text-ink-secondary tabular-nums">
-                        {unitTasks.length} {unitTasks.length === 1 ? "task" : "tasks"}
-                      </td>
+
                       <td className="py-3.5 px-4">
                         <ProgressBar value={progress} />
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         <Badge status={villa.status} />
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon="sliders"
+                            onClick={() => onEditPhases(villa)}
+                          >
+                            Phases
+                          </Button>
+
+                          {canUploadState && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              icon="plus"
+                              onClick={() => onUploadState(villa)}
+                            >
+                              Upload state
+                            </Button>
+                          )}
+
+                          {canApproveRework &&
+                            villa.status === "REWORK_REQUIRED" && (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                icon="check"
+                                onClick={() => onApproveRework(villa)}
+                              >
+                                Approve rework
+                              </Button>
+                            )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1104,6 +1452,624 @@ function Villas({
         </Card>
       )}
     </div>
+  );
+}
+
+/* ==========================================================================
+   UPLOAD VILLA STATE MODAL (Engineer & Director in Operations / Villas)
+   ========================================================================== */
+
+function UploadVillaStateModal({
+  villas,
+  initialVilla,
+  close,
+  done,
+}: {
+  villas: Villa[];
+  initialVilla: Villa;
+  close: () => void;
+  done: () => Promise<void>;
+}) {
+  const [selectedVillaId, setSelectedVillaId] = useState(initialVilla.id);
+  const currentVilla =
+    villas.find((v) => v.id === selectedVillaId) || initialVilla;
+  const availablePhases =
+    currentVilla.phases && currentVilla.phases.length > 0
+      ? currentVilla.phases
+      : buildDefaultVillaPhases();
+
+  const [status, setStatus] = useState(currentVilla.status || "IN_PROGRESS");
+  const [progress, setProgress] = useState(currentVilla.progress ?? 50);
+  const [workSection, setWorkSection] = useState(
+    currentVilla.work_section || availablePhases[0]?.name || "Services & waterproofing"
+  );
+  const [note, setNote] = useState("");
+  const [evidenceFile, setEvidenceFile] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleVillaChange = (id: string) => {
+    setSelectedVillaId(id);
+    const found = villas.find((v) => v.id === id);
+    if (found) {
+      setStatus(found.status || "IN_PROGRESS");
+      setProgress(found.progress ?? 50);
+      setWorkSection(
+        found.work_section ||
+          found.phases?.[0]?.name ||
+          "Services & waterproofing"
+      );
+    }
+  };
+
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await api(`/villas/${selectedVillaId}/state`, {
+        method: "POST",
+        body: JSON.stringify({
+          status,
+          progress:
+            status === "COMPLETED"
+              ? 100
+              : status === "NOT_STARTED"
+              ? 0
+              : progress,
+          work_section: workSection,
+          note,
+          evidence_file: evidenceFile || null,
+        }),
+      });
+      await done();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      onClose={close}
+      onSubmit={save}
+      eyebrow="Operations / Villas · Field State Upload"
+      title={`Upload state for Villa ${currentVilla.villa_number}`}
+      description="Record the current operational state, completion percentage, active phase, and site inspection notes."
+      submitLabel={saving ? "Uploading state…" : "Upload villa state"}
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormField label="Villa" htmlFor="upload-villa-select" required>
+          <Select
+            id="upload-villa-select"
+            value={selectedVillaId}
+            onChange={(e) => handleVillaChange(e.target.value)}
+          >
+            {villas.map((v) => (
+              <option key={v.id} value={v.id}>
+                Villa {v.villa_number} ({v.block})
+              </option>
+            ))}
+          </Select>
+        </FormField>
+
+        <FormField
+          label="Linked Phase / Work Section"
+          htmlFor="upload-phase-select"
+          required
+        >
+          <Select
+            id="upload-phase-select"
+            value={workSection}
+            onChange={(e) => setWorkSection(e.target.value)}
+          >
+            {availablePhases.map((p, idx) => (
+              <option key={`${p.name}-${idx}`} value={p.name}>
+                {String(idx + 1).padStart(2, "0")} · {p.name} ({p.plannedDays}d)
+              </option>
+            ))}
+          </Select>
+        </FormField>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormField
+          label="Operational state"
+          htmlFor="upload-status-select"
+          required
+        >
+          <Select
+            id="upload-status-select"
+            value={status}
+            onChange={(e) => {
+              const next = e.target.value;
+              setStatus(next);
+              if (next === "COMPLETED") setProgress(100);
+              else if (next === "NOT_STARTED") setProgress(0);
+            }}
+          >
+            <option value="IN_PROGRESS">In progress</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="BLOCKED">Blocked</option>
+            <option value="REWORK_REQUIRED">
+              Rework required (Flags Manager approval)
+            </option>
+            <option value="NOT_STARTED">Not started</option>
+          </Select>
+        </FormField>
+
+        <FormField
+          label="Completion (%)"
+          htmlFor="upload-progress-input"
+          required
+        >
+          <Input
+            id="upload-progress-input"
+            type="number"
+            min={0}
+            max={status === "COMPLETED" ? 100 : 99}
+            value={
+              status === "COMPLETED"
+                ? 100
+                : status === "NOT_STARTED"
+                ? 0
+                : progress
+            }
+            disabled={status === "COMPLETED" || status === "NOT_STARTED"}
+            onChange={(e) => setProgress(Number(e.target.value))}
+            className="font-mono"
+            required
+          />
+        </FormField>
+      </div>
+
+      <FormField
+        label={
+          status === "REWORK_REQUIRED"
+            ? "Rework defect & rectification note"
+            : "Site state note"
+        }
+        htmlFor="upload-state-note"
+        required
+      >
+        <Textarea
+          id="upload-state-note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Describe current field progress, quality inspection observations, or reason for rework…"
+          required
+        />
+      </FormField>
+
+      <FormField
+        label="Attach field evidence / state document (optional)"
+        htmlFor="upload-evidence-file"
+        helperText="Attach a site photo, QA checklist, or test report."
+      >
+        <Input
+          id="upload-evidence-file"
+          type="file"
+          accept="image/*,.pdf,.doc,.docx,.xlsx"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            setEvidenceFile(file ? file.name : "");
+          }}
+        />
+      </FormField>
+    </Modal>
+  );
+}
+
+/* ==========================================================================
+   APPROVE REWORK MODAL (Manager & Director)
+   ========================================================================== */
+
+function ApproveReworkModal({
+  villa,
+  close,
+  done,
+}: {
+  villa: Villa;
+  close: () => void;
+  done: () => Promise<void>;
+}) {
+  const [nextStatus, setNextStatus] = useState<"IN_PROGRESS" | "COMPLETED">(
+    "IN_PROGRESS"
+  );
+  const [progress, setProgress] = useState(Math.max(villa.progress || 50, 70));
+  const [note, setNote] = useState(
+    "Rectification verified on site. Rework approved and quality hold cleared."
+  );
+
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await api(`/villas/${villa.id}/approve-rework`, {
+      method: "POST",
+      body: JSON.stringify({
+        next_status: nextStatus,
+        progress: nextStatus === "COMPLETED" ? 100 : progress,
+        note,
+      }),
+    });
+    await done();
+  };
+
+  return (
+    <Modal
+      onClose={close}
+      onSubmit={save}
+      eyebrow="Quality Gate · Rework Approval"
+      title={`Approve rework for Villa ${villa.villa_number}`}
+      description="Verify the field team's rectification and clear the rework hold."
+      submitLabel="Approve rework"
+    >
+      <div className="rounded-control border border-danger-border bg-danger-bg p-3.5 space-y-1 text-xs">
+        <div className="font-mono font-semibold text-danger-text uppercase tracking-wider">
+          Reported Rework ({villa.work_section})
+        </div>
+        <p className="text-ink-secondary leading-relaxed">{villa.state_note}</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormField
+          label="Post-approval villa status"
+          htmlFor="rework-next-status"
+          required
+        >
+          <Select
+            id="rework-next-status"
+            value={nextStatus}
+            onChange={(e) => {
+              const val = e.target.value as "IN_PROGRESS" | "COMPLETED";
+              setNextStatus(val);
+              if (val === "COMPLETED") setProgress(100);
+            }}
+          >
+            <option value="IN_PROGRESS">
+              In progress (Cleared to continue)
+            </option>
+            <option value="COMPLETED">Completed (100% verified)</option>
+          </Select>
+        </FormField>
+
+        <FormField
+          label="Updated completion (%)"
+          htmlFor="rework-progress"
+          required
+        >
+          <Input
+            id="rework-progress"
+            type="number"
+            min={1}
+            max={100}
+            value={nextStatus === "COMPLETED" ? 100 : progress}
+            disabled={nextStatus === "COMPLETED"}
+            onChange={(e) => setProgress(Number(e.target.value))}
+            className="font-mono"
+            required
+          />
+        </FormField>
+      </div>
+
+      <FormField
+        label="Manager approval sign-off note"
+        htmlFor="rework-approval-note"
+        required
+      >
+        <Textarea
+          id="rework-approval-note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          required
+        />
+      </FormField>
+    </Modal>
+  );
+}
+
+/* ==========================================================================
+   EDIT VILLA & PHASES MODAL (Linked to Work Sections Page)
+   ========================================================================== */
+
+function EditVillaPhasesModal({
+  villa,
+  close,
+  done,
+}: {
+  villa: Villa;
+  close: () => void;
+  done: (openInWorkSections: boolean) => Promise<void>;
+}) {
+  const [villaNumber, setVillaNumber] = useState(villa.villa_number);
+  const [block, setBlock] = useState(villa.block || "");
+  const [villaType, setVillaType] = useState(villa.villa_type || "");
+  const [phases, setPhases] = useState<VillaPhaseConfig[]>(() =>
+    reconcileVillaPhases(
+      villa.phases && villa.phases.length > 0
+        ? villa.phases
+        : buildDefaultVillaPhases()
+    )
+  );
+  const [newPhaseName, setNewPhaseName] = useState("");
+  const [newPhaseDays, setNewPhaseDays] = useState(14);
+  const [newPhaseStart, setNewPhaseStart] = useState(60);
+  const [newPhaseParallel, setNewPhaseParallel] = useState(true);
+  const [openAfterSave, setOpenAfterSave] = useState(false);
+
+  const updatePhaseField = (
+    idx: number,
+    patch: Partial<VillaPhaseConfig>
+  ) => {
+    setPhases((prev) => {
+      const updated = prev.map((item, i) =>
+        i === idx ? { ...item, ...patch } : item
+      );
+      return reconcileVillaPhases(updated);
+    });
+  };
+
+  const removePhase = (idx: number) => {
+    if (phases.length <= 1) return;
+    setPhases((prev) =>
+      reconcileVillaPhases(prev.filter((_, i) => i !== idx))
+    );
+  };
+
+  const handleAddPhase = () => {
+    const trimmed = newPhaseName.trim();
+    if (!trimmed) return;
+    const nextIdx = phases.length;
+    const added: VillaPhaseConfig = {
+      phaseIndex: nextIdx,
+      name: trimmed,
+      plannedDays: Math.max(1, Number(newPhaseDays) || 10),
+      startDay: Math.max(1, Number(newPhaseStart) || 1),
+      endDay:
+        Math.max(1, Number(newPhaseStart) || 1) +
+        Math.max(1, Number(newPhaseDays) || 10) -
+        1,
+      allowParallel: newPhaseParallel,
+      status: "NOT_STARTED",
+    };
+    setPhases((prev) => reconcileVillaPhases([...prev, added]));
+    setNewPhaseName("");
+  };
+
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const finalPhases = newPhaseName.trim()
+      ? reconcileVillaPhases([
+          ...phases,
+          {
+            phaseIndex: phases.length,
+            name: newPhaseName.trim(),
+            plannedDays: Math.max(1, Number(newPhaseDays) || 10),
+            startDay: Math.max(1, Number(newPhaseStart) || 1),
+            endDay:
+              Math.max(1, Number(newPhaseStart) || 1) +
+              Math.max(1, Number(newPhaseDays) || 10) -
+              1,
+            allowParallel: newPhaseParallel,
+            status: "NOT_STARTED",
+          },
+        ])
+      : phases;
+
+    await api(`/villas/${villa.id}/edit`, {
+      method: "POST",
+      body: JSON.stringify({
+        villa_number: villaNumber,
+        block,
+        villa_type: villaType,
+        phases: finalPhases,
+      }),
+    });
+    await done(openAfterSave);
+  };
+
+  return (
+    <Modal
+      onClose={close}
+      onSubmit={save}
+      eyebrow={`Villa ${villa.villa_number} · Linked to Work Sections`}
+      title="Edit villa & finishing phases"
+      description="Configure phases for this villa. Parallel phases can overlap concurrently; sequential phases auto-shift so there are never any day conflicts."
+      submitLabel={
+        openAfterSave
+          ? "Save & open Work sections"
+          : "Save villa & phases"
+      }
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <FormField label="Villa number" required>
+          <Input
+            value={villaNumber}
+            onChange={(e) => setVillaNumber(e.target.value)}
+            required
+          />
+        </FormField>
+        <FormField label="Block">
+          <Input value={block} onChange={(e) => setBlock(e.target.value)} />
+        </FormField>
+        <FormField label="Villa type">
+          <Input
+            value={villaType}
+            onChange={(e) => setVillaType(e.target.value)}
+          />
+        </FormField>
+      </div>
+
+      {/* Configured Phases Table */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-ink">
+            Assigned Villa Phases ({phases.length} · 0 duration conflicts)
+          </span>
+          <Badge variant="success" dot={false} mono>
+            End Day = Start + Days - 1
+          </Badge>
+        </div>
+
+        <div className="max-h-60 overflow-y-auto rounded-control border border-border divide-y divide-border-subtle bg-surface-subtle/50">
+          {phases.map((ph, idx) => (
+            <div
+              key={`${ph.name}-${idx}`}
+              className="p-3 flex flex-col gap-2 text-xs bg-surface"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-mono font-semibold text-accent-text">
+                    #{String(idx + 1).padStart(2, "0")}
+                  </span>
+                  <span className="font-semibold text-ink truncate">
+                    {ph.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="font-mono text-[11px] text-ink-secondary bg-surface-subtle border border-border px-1.5 py-0.5 rounded">
+                    Day {ph.startDay}–{ph.endDay} ({ph.plannedDays}d)
+                  </span>
+                  {phases.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removePhase(idx)}
+                      className="text-ink-muted hover:text-danger-text"
+                      title="Remove phase"
+                    >
+                      <Icon name="x" className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 items-center">
+                <div>
+                  <label className="block text-[10px] font-mono text-ink-muted mb-0.5">
+                    Start Day
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={150}
+                    value={ph.startDay}
+                    onChange={(e) =>
+                      updatePhaseField(idx, {
+                        startDay: Math.max(1, Number(e.target.value) || 1),
+                      })
+                    }
+                    className="h-7 text-xs font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-ink-muted mb-0.5">
+                    Duration (Days)
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={ph.plannedDays}
+                    onChange={(e) =>
+                      updatePhaseField(idx, {
+                        plannedDays: Math.max(1, Number(e.target.value) || 1),
+                      })
+                    }
+                    className="h-7 text-xs font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono text-ink-muted mb-0.5">
+                    Overlap Mode
+                  </label>
+                  <Select
+                    value={ph.allowParallel ? "PARALLEL" : "SEQUENTIAL"}
+                    onChange={(e) =>
+                      updatePhaseField(idx, {
+                        allowParallel: e.target.value === "PARALLEL",
+                      })
+                    }
+                    className="h-7 text-xs"
+                  >
+                    <option value="PARALLEL">Parallel allowed</option>
+                    <option value="SEQUENTIAL">Sequential (no overlap)</option>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Add New Phase Linked to Work Sections */}
+      <div className="rounded-control border border-accent-border bg-accent-subtle/40 p-3.5 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-accent-text">
+            Add a phase (Syncs to Work sections page)
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="sm:col-span-2">
+            <Input
+              placeholder="New phase name (e.g. Smart Home & Automation)"
+              value={newPhaseName}
+              onChange={(e) => setNewPhaseName(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              type="number"
+              min={1}
+              max={90}
+              value={newPhaseDays}
+              onChange={(e) => setNewPhaseDays(Number(e.target.value) || 7)}
+              title="Planned duration in days"
+              placeholder="Days"
+              className="font-mono"
+            />
+            <Input
+              type="number"
+              min={1}
+              max={150}
+              value={newPhaseStart}
+              onChange={(e) => setNewPhaseStart(Number(e.target.value) || 1)}
+              title="Start day"
+              placeholder="Start"
+              className="font-mono"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+            <input
+              type="checkbox"
+              checked={newPhaseParallel}
+              onChange={(e) => setNewPhaseParallel(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border text-accent"
+            />
+            <span>Can overlap & run in parallel with other phases</span>
+          </label>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon="plus"
+            onClick={handleAddPhase}
+          >
+            Add phase to list
+          </Button>
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 text-xs text-ink-secondary cursor-pointer pt-1">
+        <input
+          type="checkbox"
+          checked={openAfterSave}
+          onChange={(e) => setOpenAfterSave(e.target.checked)}
+          className="h-3.5 w-3.5 rounded border-border text-accent"
+        />
+        <span>
+          Open this villa in the <strong>Work sections</strong> page after
+          saving
+        </span>
+      </label>
+    </Modal>
   );
 }
 
@@ -1375,7 +2341,7 @@ function PeoplePanel({ canManage }: { canManage: boolean }) {
         <EmptyState
           icon="lock"
           title="Restricted access"
-          description="Your role does not include people administration permissions."
+          description="Only the Director role includes people administration permissions."
         />
       </div>
     );
@@ -1386,7 +2352,7 @@ function PeoplePanel({ canManage }: { canManage: boolean }) {
       <PageHeader
         eyebrow="Organisation access"
         title="People"
-        description="Manage site engineers, QA inspectors, project managers, and role permissions."
+        description="Manage site engineers, project managers, directors, and role permissions."
         action={
           <Button icon="plus" onClick={() => setShowForm(true)}>
             Add person
@@ -1430,47 +2396,35 @@ function PeoplePanel({ canManage }: { canManage: boolean }) {
                 title="Team members"
                 subtitle="Authenticated employees and assigned employee codes"
               />
-              {data.employees.length === 0 ? (
-                <div className="p-5">
-                  <EmptyState
-                    icon="people"
-                    title="No people are registered yet"
-                    description="Create the first employee account to assign site responsibilities."
-                    actionLabel="Add person"
-                    onAction={() => setShowForm(true)}
-                  />
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-border bg-surface-subtle text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
-                        <th className="py-3 px-4">Full Name</th>
-                        <th className="py-3 px-4">Employee ID</th>
-                        <th className="py-3 px-4 text-right">Status</th>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-subtle text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+                      <th className="py-3 px-4">Full Name</th>
+                      <th className="py-3 px-4">Employee ID</th>
+                      <th className="py-3 px-4 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-subtle text-sm">
+                    {data.employees.map((person) => (
+                      <tr
+                        key={person.id}
+                        className="transition-colors duration-fast hover:bg-surface-subtle"
+                      >
+                        <td className="py-3 px-4 font-medium text-ink">
+                          {person.full_name}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-xs text-ink-secondary">
+                          {person.employee_code}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <Badge status={person.status} />
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-subtle text-sm">
-                      {data.employees.map((person) => (
-                        <tr
-                          key={person.id}
-                          className="transition-colors duration-fast hover:bg-surface-subtle"
-                        >
-                          <td className="py-3 px-4 font-medium text-ink">
-                            {person.full_name}
-                          </td>
-                          <td className="py-3 px-4 font-mono text-xs text-ink-secondary">
-                            {person.employee_code}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <Badge status={person.status} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </Card>
 
             <Card noPadding>
@@ -1650,7 +2604,7 @@ function DocumentsPanel() {
 }
 
 /* ==========================================================================
-   ADD VILLA MODAL
+   ADD VILLA MODAL (Director)
    ========================================================================== */
 
 function AddVilla({
@@ -1686,13 +2640,13 @@ function AddVilla({
       submitLabel="Save villa"
     >
       <FormField label="Villa number" required>
-        <Input name="villa_number" placeholder="e.g. V-106" required />
+        <Input name="villa_number" placeholder="e.g. V-107" required />
       </FormField>
       <FormField label="Block" helperText="Sector or cluster identifier">
-        <Input name="block" placeholder="e.g. North Wing" />
+        <Input name="block" placeholder="e.g. Block B · South" />
       </FormField>
       <FormField label="Villa type" helperText="Architectural typology">
-        <Input name="villa_type" placeholder="e.g. 5BR Signature" />
+        <Input name="villa_type" placeholder="e.g. Type B · 5BR Signature" />
       </FormField>
     </Modal>
   );

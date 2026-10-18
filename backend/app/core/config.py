@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     database_url: str = ""
     jwt_audience: str = "authenticated"
     jwt_issuer: str = ""
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
     auth_disabled: bool = True

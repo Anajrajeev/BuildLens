@@ -7,7 +7,7 @@ from app.core.config import get_settings
 
 settings = get_settings()
 app = FastAPI(title="BuildLens API", version="0.1.0", openapi_url="/openapi.json", docs_url="/docs")
-app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=True, allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type", "X-Request-ID"])
+app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=True, allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-BuildLens-Role"])
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):

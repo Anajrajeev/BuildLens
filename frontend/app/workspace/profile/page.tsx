@@ -105,14 +105,23 @@ export default function ProfilePage() {
   return (
     <main className="min-h-screen bg-canvas text-ink flex flex-col">
       <header className="sticky top-0 z-20 h-14 border-b border-border bg-surface/95 backdrop-blur-sm px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
-        <Button
-          variant="secondary"
-          size="sm"
-          icon="arrow-left"
-          onClick={() => router.push("/workspace")}
-        >
-          Workspace
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="arrow-left"
+            onClick={() => router.push("/workspace")}
+          >
+            Workspace
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/")}
+          >
+            Switch role
+          </Button>
+        </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <BrandLogo />
